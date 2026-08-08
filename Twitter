@@ -5,13 +5,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+local playerGui = player:WaitForChild("PlayerGui", 10)
 
-local entityModel = true
+-- Kiểm tra GameData và Room
 local gameData = ReplicatedStorage:WaitForChild("GameData", 10)
 local lastroom = gameData and gameData:WaitForChild("LatestRoom", 10)
 
-if not entityModel or not lastroom then return end
+if not lastroom then 
+	warn("[Twiter Script] Không tìm thấy LatestRoom, hủy thực thi!")
+	return 
+end
 
 -- Âm thanh cảnh báo ban đầu
 local warningSound = Instance.new("Sound")
@@ -26,17 +29,21 @@ for i = 1, initialRoomWait do
 	lastroom.Changed:Wait()
 end
 
--- Tải âm thanh từ Github
+-- Tải âm thanh từ Github (Đã sửa lỗi Raw URL)
 local function GetGitSound(GithubSnd, SoundName)
-	local url = GithubSnd
-	if not isfile(SoundName .. ".mp3") then
+	local url = GithubSnd:gsub("github%.com", "raw.githubusercontent.com"):gsub("/blob/", "/"):gsub("%?raw=true", "")
+	local fileName = SoundName:sub(-4):lower() == ".mp3" and SoundName or (SoundName .. ".mp3")
+
+	if not isfile(fileName) then
 		pcall(function()
-			writefile(SoundName .. ".mp3", game:HttpGet(url))
+			writefile(fileName, game:HttpGet(url))
 		end)
 	end
+
 	local sound = Instance.new("Sound")
-	if (getcustomasset or getsynasset) and isfile(SoundName .. ".mp3") then
-		sound.SoundId = (getcustomasset or getsynasset)(SoundName .. ".mp3")
+	local getAsset = getcustomasset or getsynasset or syn_getcustomasset
+	if getAsset and isfile(fileName) then
+		sound.SoundId = getAsset(fileName)
 	else
 		sound.SoundId = url
 	end
@@ -49,19 +56,30 @@ Jumpscare.Volume = 6
 Jumpscare.PlaybackSpeed = 1
 Jumpscare:Play()
 
+-- Tải ảnh từ Github
 function GitPNG(GithubImg, ImageName)
-	local url = GithubImg
-	if not isfile(ImageName .. ".png") then
+	local url = GithubImg:gsub("github%.com", "raw.githubusercontent.com"):gsub("/blob/", "/"):gsub("%?raw=true", "")
+	local fileName = ImageName:sub(-4):lower() == ".png" and ImageName or (ImageName .. ".png")
+
+	if not isfile(fileName) then
 		local success, response = pcall(function()
 			return game:HttpGet(url)
 		end)
-		if success then
-			writefile(ImageName .. ".png", response)
+
+		if success and response and #response > 0 then
+			writefile(fileName, response)
 		else
-			error(": " .. response)
+			warn("[GitPNG Error] Không thể tải ảnh: " .. tostring(url))
+			return ""
 		end
 	end
-	return (getcustomasset or getsynasset)(ImageName .. ".png")
+
+	local getAsset = getcustomasset or getsynasset or syn_getcustomasset
+	if getAsset then
+		return getAsset(fileName)
+	else
+		return ""
+	end
 end
 
 local depthsTer
@@ -69,7 +87,10 @@ pcall(function()
 	depthsTer = game:GetObjects("rbxassetid://12802494019")[1]
 end)
 
-if not depthsTer then return end
+if not depthsTer then 
+	warn("[Twiter Script] Không thể lấy Model rbxassetid://12802494019!")
+	return 
+end
 
 depthsTer.Name = "Twiter"
 depthsTer.Parent = workspace
@@ -77,7 +98,6 @@ depthsTer.Parent = workspace
 local part = depthsTer:FindFirstChildWhichIsA("BasePart") or depthsTer:FindFirstChildWhichIsA("Part")
 if not part then return end
 
--- Đặt vị trí xuất hiện an toàn
 local currentRooms = workspace:FindFirstChild("CurrentRooms")
 if currentRooms then
 	local roomsList = currentRooms:GetChildren()
@@ -89,25 +109,31 @@ if currentRooms then
 	end
 end
 
--- Tắt/Bật âm thanh an toàn
+-- Âm thanh hiệu ứng
 if part:FindFirstChild("Footsteps") then part.Footsteps.Playing = false end
 if part:FindFirstChild("Kill") then part.Kill:Play() end
 if part:FindFirstChild("Repent") then part.Repent:Play() end
 if part:FindFirstChild("Scream") then part.Scream:Play() end
 
-part.Attachment.ParticleEmitter.Texture = GitPNG("https://github.com/eoyoustme/Mayhem-Remake/blob/main/Mayhem%20mode%20recreate_TwisterScream2.mp3?raw=true", "ACTALLY?")
-part.Attachment.BlackTrail.Texture = GitPNG("https://github.com/eoyoustme/Mayhem-Remake/blob/main/Mayhem%20mode%20recreate_TwisterScream2.mp3?raw=true", "ACTALLY?")
+local textureAsset = GitPNG("https://github.com/eoyoustme/Mayhem-Remake/blob/main/Twitser.png", "ACTALLY")
+if part:FindFirstChild("Attachment") then
+	if part.Attachment:FindFirstChild("ParticleEmitter") then
+		part.Attachment.ParticleEmitter.Texture = textureAsset
+	end
+	if part.Attachment:FindFirstChild("BlackTrail") then
+		part.Attachment.BlackTrail.Texture = textureAsset
+	end
+end
 
 local damageInterval = 0.5
 local damageAmount = 10
 local activeTime = 3
-
 local crazy = part:FindFirstChild("Attachment") and part.Attachment:FindFirstChildOfClass("PointLight")
 
 task.spawn(function()
 	local char = player.Character or player.CharacterAdded:Wait()
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	local hrp = char:WaitForChild("HumanoidRootPart", 5)
+	local humanoid = char:WaitForChild("Humanoid", 5)
 
 	if not hrp or not humanoid then return end
 
@@ -129,34 +155,36 @@ task.spawn(function()
 			local currentPos = hrp.Position
 			if (currentPos - lastPos).Magnitude > 0.5 then
 				pcall(function()
-					require(playerGui.MainUI.Initiator.Main_Game).caption("", true)
+					if playerGui:FindFirstChild("MainUI") and playerGui.MainUI:FindFirstChild("Initiator") then
+						require(playerGui.MainUI.Initiator.Main_Game).caption("", true)
+					end
 				end)
 
 				humanoid.Health = math.max(0, humanoid.Health - damageAmount)
 
 				if humanoid.Health <= 0 then
-					-- Death Hint
+					-- Death Hint Safe Hook
 					pcall(function()
-						local func, setupval, getinfo, typeof, getgc, next = nil, debug.setupvalue or setupvalue, debug.getinfo or getinfo, typeof, getgc, next
+						local setupval = debug.setupvalue or setupvalue
+						local getinfo = debug.getinfo or getinfo
+						local getgc = getgc
 
-						for i, v in next, getgc(false) do
-							if typeof(v) == "function" then
-								local info = getinfo(v)
-								if info.currentline == 54 and info.nups == 2 and info.is_vararg == 0 then
-									func = v
-									break
+						if getgc then
+							for _, v in pairs(getgc(false)) do
+								if type(v) == "function" then
+									local info = getinfo(v)
+									if info and info.nups == 2 and info.is_vararg == 0 then
+										setupval(v, 1, {
+											"You died to Twiter.",
+											"It punishes movement.",
+											"When you hear the warning, freeze.",
+											"Standing still might save your life."
+										})
+										setupval(v, 2, "Blue")
+										break
+									end
 								end
 							end
-						end
-
-						if func then
-							setupval(func, 1, {
-								"You died to Twiter.",
-								"It punishes movement.",
-								"When you hear the warning, freeze.",
-								"Standing still might save your life."
-							})
-							setupval(func, 2, "Blue")
 						end
 					end)
 				end
@@ -166,14 +194,12 @@ task.spawn(function()
 		elapsedTime = elapsedTime + damageInterval
 	end
 
-	task.wait(3)
-
 	if Jumpscare and Jumpscare.Parent then
-		TweenService:Create(Jumpscare, TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), { Volume = 0 }):Play()
+		TweenService:Create(Jumpscare, TweenInfo.new(1, Enum.EasingStyle.Linear), { Volume = 0 }):Play()
 	end
 
 	if crazy then
-		TweenService:Create(crazy, TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), { Range = 0 }):Play()
+		TweenService:Create(crazy, TweenInfo.new(1, Enum.EasingStyle.Linear), { Range = 0 }):Play()
 	end
 
 	task.wait(1)
@@ -181,6 +207,7 @@ task.spawn(function()
 	if Jumpscare then Jumpscare:Destroy() end
 	if depthsTer then depthsTer:Destroy() end
 
+	-- Custom Achievement
 	pcall(function()
 		local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
 		achievementGiver({
