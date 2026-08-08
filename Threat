@@ -170,6 +170,20 @@ end)
 
 entity:SetCallback("OnDespawning", function()
 	print("Entity is despawning")
+
+local success, achievementGiver = pcall(function()
+                    return loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
+                end)
+
+                if success and achievementGiver then
+                    achievementGiver({
+                        Title = "Negative",
+                        Desc = "Is have SO Much Fun..kiddo..",
+                        Reason = "Encounter and survive Threat..",
+                        Image = "rbxassetid://71770268682304"
+                    })
+                end
+
 	local colorCorrection = game.Lighting:FindFirstChild("MainColorCorrection")
 	if colorCorrection then
 		colorCorrection.TintColor = Color3.fromRGB(255, 255, 255)
