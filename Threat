@@ -1,0 +1,323 @@
+
+
+---====== Load spawner ======---
+
+local spawner = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Entity%20Spawner/V2/Source.lua"))()
+
+---====== Create entity ======---
+
+local entity = spawner.Create({
+	Entity = {
+		Name = "Threat",
+		Asset = "rbxassetid://94956621825276",
+		HeightOffset = 0
+	},
+	Lights = {
+		Flicker = {
+			Enabled = false,
+			Duration = 1
+		},
+		Shatter = false,
+		Repair = false
+	},
+	Earthquake = {
+		Enabled = false
+	},
+	CameraShake = {
+		Enabled = true,
+		Range = 100,
+		Values = {10.5, 40, 0.1, 1} -- Magnitude, Roughness, FadeIn, FadeOut
+	},
+	Movement = {
+		Speed = 125,
+		Delay = 4,
+		Reversed = true
+	},
+	Rebounding = {
+		Enabled = true,
+		Type = "Ambush", -- "Blitz"
+		Min = 4,
+		Max = 4,
+		Delay = 0.2
+	},
+	Damage = {
+		Enabled = true,
+		Range = 70,
+		Amount = 0.01
+	},
+	Crucifixion = {
+		Enabled = true,
+		Range = 40,
+		Resist = false,
+		Break = true
+	},
+	Death = {
+		Type = "Guiding", -- "Curious"
+		Hints = {"Death", "Hints", "Go", "Here"},
+		Cause = ""
+	}
+})
+
+---====== Debug entity ======---
+
+entity:SetCallback("OnSpawned", function()
+	print("Entity has spawned")
+	local CameraShaker = require(game.ReplicatedStorage:WaitForChild("CameraShaker"))
+	local camera = game.Workspace.CurrentCamera
+	local camShake = CameraShaker.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
+		camera.CFrame = camera.CFrame * shakeCf
+	end)
+	camShake:Start()
+	camShake:ShakeOnce(20, 3, 0.1, 6)
+
+	local Lighting = game:GetService("Lighting")
+	local TweenService = game:GetService("TweenService")
+
+	local colorCorrection = Lighting:FindFirstChild("MainColorCorrection")
+	if not colorCorrection then
+		colorCorrection = Instance.new("ColorCorrectionEffect")
+		colorCorrection.Name = "MainColorCorrection"
+		colorCorrection.Parent = Lighting
+	end
+
+	colorCorrection.TintColor = Color3.fromRGB(255, 255, 255)
+	colorCorrection.Contrast = 0.1
+
+	TweenService:Create(colorCorrection, TweenInfo.new(2.5), {Contrast = 0}):Play()
+
+	local redTween = TweenService:Create(colorCorrection, TweenInfo.new(5), {TintColor = Color3.fromRGB(250, 0, 0)})
+	redTween:Play()
+
+	task.wait(0.5)
+
+	local colors = {
+		Color3.fromRGB(255, 255, 0),  
+		Color3.fromRGB(0, 0, 255),    
+		Color3.fromRGB(0, 255, 0),   
+		Color3.fromRGB(255, 105, 180)  
+	}
+
+	for _ = 1, 2 do
+		for _, color in ipairs(colors) do
+			local tween = TweenService:Create(colorCorrection, TweenInfo.new(0.35), {TintColor = color})
+			tween:Play()
+			task.wait(0.25)
+		end
+	end
+
+	local finalRed = TweenService:Create(colorCorrection, TweenInfo.new(1), {TintColor = Color3.fromRGB(250, 0, 0)})
+	finalRed:Play()
+end)
+
+entity:SetCallback("OnStartMoving", function()
+	print("Entity has started moving")
+end)
+
+entity:SetCallback("OnEnterRoom", function(room, firstTime)
+	if firstTime == true then
+		print("Entity has entered room: ".. room.Name.. " for the first time")
+	else
+		print("Entity has entered room: ".. room.Name.. " again")
+	end
+end)
+
+entity:SetCallback("OnLookAt", function(lineOfSight)
+	if lineOfSight == true then
+		print("Player is looking at entity")
+	else
+		print("Player view is obstructed by something")
+	end
+end)
+
+entity:SetCallback("OnRebounding", function(startOfRebound)
+	if startOfRebound == true then
+		local TweenService = game:GetService("TweenService")
+		print("Entity has started rebounding")
+
+		pcall(function()
+			if workspace:FindFirstChild("Threat") and workspace.Threat:FindFirstChild("Sound") then
+				workspace.Threat.Sound:Play()
+			end
+		end)
+
+		local colors = {
+			Color3.fromRGB(255, 255, 0),   
+			Color3.fromRGB(0, 0, 255),    
+			Color3.fromRGB(0, 255, 0),    
+			Color3.fromRGB(255, 105, 180), 
+			Color3.fromRGB(255, 0, 0),     
+			Color3.fromRGB(160, 32, 240)   
+		}
+
+		local randomColor = colors[math.random(1, #colors)]
+
+		entity.Config.Movement.Speed = entity.Config.Movement.Speed * 1.3
+		print("New Speed:", entity.Config.Movement.Speed)
+
+		-- Cập nhật hiệu ứng màn hình
+		local colorCorrection = game.Lighting:FindFirstChild("MainColorCorrection")
+		if colorCorrection then
+			colorCorrection.Contrast = 0
+			colorCorrection.Saturation = 0
+
+			local tween = TweenService:Create(colorCorrection, TweenInfo.new(0.5), {TintColor = randomColor})
+			tween:Play()
+		end
+	else
+		print("Entity has finished rebounding")
+	end
+end)
+
+entity:SetCallback("OnDespawning", function()
+	print("Entity is despawning")
+	local colorCorrection = game.Lighting:FindFirstChild("MainColorCorrection")
+	if colorCorrection then
+		colorCorrection.TintColor = Color3.fromRGB(255, 255, 255)
+		colorCorrection.Contrast = 0
+		colorCorrection.Saturation = 0
+
+		local TweenService = game:GetService("TweenService")
+		TweenService:Create(colorCorrection, TweenInfo.new(2.5), {Contrast = 0}):Play()
+		local TW = TweenService:Create(colorCorrection, TweenInfo.new(5), {TintColor = Color3.fromRGB(255, 255, 255)})
+		TW:Play()
+	end
+end)
+
+entity:SetCallback("OnDespawned", function()
+	print("Entity has despawned")
+end)
+
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+
+entity:SetCallback("OnDamagePlayer", function(newHealth)
+	if newHealth == 0 then
+		print("Entity has killed the player")
+	else
+		print("Entity has damaged the player")
+
+		task.spawn(function()
+			local player = Players.LocalPlayer
+			local character = player.Character or player.CharacterAdded:Wait()
+			local humanoid = character:WaitForChild("Humanoid", 5)
+			local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+			local camera = workspace.CurrentCamera
+
+			local entityModel = workspace:WaitForChild("Threat")
+			local primaryPart = entityModel:FindFirstChild("ThreatMoving")
+
+			if not (entityModel and humanoid and humanoidRootPart and primaryPart and camera) then return end
+
+			local originalWalkSpeed = humanoid.WalkSpeed
+			local originalJumpPower = humanoid.JumpPower
+			humanoid.WalkSpeed = 0
+			humanoid.JumpPower = 0
+
+			local controlsModule = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule")):GetControls()
+			controlsModule:Disable()
+
+			local to5 = true
+			task.spawn(function()
+				while to5 and primaryPart.Parent and humanoidRootPart.Parent do
+					local targetCFrame = humanoidRootPart.CFrame
+					local tween = TweenService:Create(primaryPart, TweenInfo.new(1, Enum.EasingStyle.Quad), {CFrame = targetCFrame})
+					tween:Play()
+					tween.Completed:Wait()
+				end
+			end)
+			task.wait(0.5)
+
+			local t5 = true
+			task.spawn(function()
+				while t5 and primaryPart.Parent and humanoidRootPart.Parent do
+					local targetCFrame = humanoidRootPart.CFrame
+					local tween = TweenService:Create(primaryPart, TweenInfo.new(100000000000000000000000000, Enum.EasingStyle.Quad), {CFrame = targetCFrame})
+					tween:Play()
+					tween.Completed:Wait()
+				end
+			end)
+
+			entity:Pause()
+
+			camera.CameraType = Enum.CameraType.Scriptable
+
+			local lockConnection
+			lockConnection = RunService.RenderStepped:Connect(function()
+				if not primaryPart or not primaryPart.Parent then
+					if lockConnection then lockConnection:Disconnect() end
+					return
+				end
+				camera.CFrame = CFrame.lookAt(camera.CFrame.Position, primaryPart.Position)
+			end)
+
+			local screenGui = Instance.new("ScreenGui")
+			screenGui.Name = "JumpscareOverlay"
+			screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+			screenGui.ResetOnSpawn = false
+			screenGui.IgnoreGuiInset = true
+			screenGui.DisplayOrder = 999999
+			screenGui.Parent = player:WaitForChild("PlayerGui")
+
+			local imageLabel = Instance.new("ImageLabel")
+			imageLabel.Name = "JumpscareImage"
+			imageLabel.BackgroundTransparency = 1
+			imageLabel.BorderSizePixel = 0
+			imageLabel.Position = UDim2.new(0, 0, 0, 0)
+			imageLabel.Size = UDim2.new(1, 0, 1, 0)
+			imageLabel.AnchorPoint = Vector2.new(0, 0)
+			imageLabel.ScaleType = Enum.ScaleType.Stretch
+			imageLabel.Image = ""
+			imageLabel.Visible = true
+			imageLabel.Parent = screenGui
+
+			local jumpscareImage1 = "rbxassetid://0"
+			local jumpscareImage2 = "rbxassetid://0"
+
+			local flashDuration = 1
+			local flashStartTime = tick()
+
+			task.spawn(function()
+				while tick() - flashStartTime < flashDuration do
+					imageLabel.Image = jumpscareImage1
+					task.wait(0.05)
+					imageLabel.Image = jumpscareImage2
+					task.wait(0.05)
+				end
+				imageLabel.Visible = false
+			end)
+
+			task.wait(2.8)
+			firesignal(game.ReplicatedStorage.RemotesFolder.DeathHint.OnClientEvent, {"You died to who you call Threat","he will get faster every he fisnhed a rebound","Hide in a closet if he spawn."},"Blue")
+
+			to5 = false -- 🟢 Đã sửa lỗi biến to5 để tắt vòng lặp di chuyển
+
+			if humanoid then humanoid.Health = 0 end
+
+			if entityModel and entityModel.Parent then
+				entityModel:Destroy()
+			end
+
+			if lockConnection then
+				lockConnection:Disconnect()
+			end
+
+			camera.CameraType = Enum.CameraType.Custom
+
+			if screenGui and screenGui.Parent then
+				screenGui:Destroy()
+			end
+
+			if humanoid and humanoid.Health > 0 then
+				humanoid.WalkSpeed = originalWalkSpeed
+				humanoid.JumpPower = originalJumpPower
+				controlsModule:Enable()
+			end
+		end)
+	end
+end)
+
+---====== Run entity ======---
+
+entity:Run()
