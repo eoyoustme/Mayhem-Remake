@@ -49,6 +49,21 @@ Jumpscare.Volume = 6
 Jumpscare.PlaybackSpeed = 1
 Jumpscare:Play()
 
+function GitPNG(GithubImg, ImageName)
+	local url = GithubImg
+	if not isfile(ImageName .. ".png") then
+		local success, response = pcall(function()
+			return game:HttpGet(url)
+		end)
+		if success then
+			writefile(ImageName .. ".png", response)
+		else
+			error(": " .. response)
+		end
+	end
+	return (getcustomasset or getsynasset)(ImageName .. ".png")
+end
+
 local depthsTer
 pcall(function()
 	depthsTer = game:GetObjects("rbxassetid://12802494019")[1]
@@ -79,6 +94,9 @@ if part:FindFirstChild("Footsteps") then part.Footsteps.Playing = false end
 if part:FindFirstChild("Kill") then part.Kill:Play() end
 if part:FindFirstChild("Repent") then part.Repent:Play() end
 if part:FindFirstChild("Scream") then part.Scream:Play() end
+
+part.Attachment.ParticleEmitter.Texture = GitPNG("https://github.com/eoyoustme/Mayhem-Remake/blob/main/Mayhem%20mode%20recreate_TwisterScream2.mp3?raw=true", "ACTALLY?")
+part.Attachment.BlackTrail.Texture = GitPNG("https://github.com/eoyoustme/Mayhem-Remake/blob/main/Mayhem%20mode%20recreate_TwisterScream2.mp3?raw=true", "ACTALLY?")
 
 local damageInterval = 0.5
 local damageAmount = 10
