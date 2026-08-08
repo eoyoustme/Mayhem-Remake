@@ -1,0 +1,143 @@
+local TweenService = game:GetService("TweenService")
+
+local Kill = true
+local damageMultiplier = 1
+local canAttack = true
+
+local eye = game:GetObjects("rbxassetid://108376519790974")[1]
+eye.Parent = game.Workspace
+eye.Name = "Manaic Eyes"
+
+local eyes = eye:IsA("BasePart") and eye or (eye:FindFirstChildWhichIsA("BasePart", true) or eye.PrimaryPart)
+
+-- Đặt vị trí ban đầu cho Model
+local currentRooms = game.Workspace.CurrentRooms:GetChildren()
+local randomY = math.random(0, 7)
+
+local randomX = math.random(5, 10) * (math.random(1, 2) == 1 and 1 or -1)
+local randomZ = math.random(5, 10) * (math.random(1, 2) == 1 and 1 or -1)
+
+-- CFrame spawn hoàn chỉnh
+local spawnCFrame = currentRooms[#currentRooms - 1].Parts.Floor.CFrame + Vector3.new(randomX, 7, randomZ)
+
+if eye:IsA("Model") then
+	eye:PivotTo(spawnCFrame)
+else
+	eyes.CFrame = spawnCFrame
+end
+
+-- Sound mặc định
+local sound = Instance.new("Sound")
+sound.Parent = eyes
+sound.SoundId = "rbxassetid://1168009240"
+sound.Volume = 10
+sound.PlaybackSpeed = 0.4
+sound:Play()
+
+wait(2)
+
+-- =========================================================
+-- KIỂM TRA HỢP THỂ VỚI MANIAC EYES BLUE
+-- =========================================================
+local maniacEyes = game.Workspace:FindFirstChild("Maniac Eyes Blue", true)
+
+if maniacEyes then
+	canAttack = false -- Tắt tấn công tạm thời để hợp thể
+
+	local targetPart = maniacEyes:FindFirstChildWhichIsA("BasePart", true) or maniacEyes.PrimaryPart
+
+	if targetPart then
+		local CFrameValue = Instance.new("CFrameValue")
+		CFrameValue.Value = eyes.CFrame
+
+		local tweenInfo = TweenInfo.new(2, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+		local tween = TweenService:Create(CFrameValue, tweenInfo, {Value = targetPart.CFrame})
+
+		local conn = CFrameValue.Changed:Connect(function(newCFrame)
+			if eye:IsA("Model") then
+				eye:PivotTo(newCFrame)
+			else
+				eyes.CFrame = newCFrame
+			end
+		end)
+
+		tween:Play()
+		tween.Completed:Wait()
+		conn:Disconnect()
+		CFrameValue:Destroy()
+
+		maniacEyes:Destroy()
+
+		-- Đổi màu Tím
+		local purpleColor = Color3.fromRGB(160, 32, 240)
+		for _, v in ipairs(eye:GetDescendants()) do
+			if v:IsA("BasePart") then
+				v.Color = purpleColor
+			elseif v:IsA("Light") then
+				v.Color = purpleColor
+			elseif v:IsA("ParticleEmitter") or v:IsA("Beam") or v:IsA("Trail") then
+				v.Color = ColorSequence.new(purpleColor)
+			end
+		end
+
+		local mergeSound = Instance.new("Sound")
+		mergeSound.Parent = eyes
+		mergeSound.SoundId = "rbxassetid://119851057500597"
+		mergeSound.Volume = 10
+		mergeSound.PlaybackSpeed = 0.5
+		mergeSound:Play()
+
+		damageMultiplier = 2
+	end
+
+	canAttack = true
+end
+
+task.wait(1.5)
+
+-- =========================================================
+-- VÒNG LẶP GÂY SÁT THƯƠNG (CÓ CHECK RAYCAST MẤT TẦM NHÌN)
+-- =========================================================
+task.spawn(function()
+	local camera = game.Workspace.CurrentCamera
+	local player = game.Players.LocalPlayer
+
+	while Kill == true do
+		task.wait(0.05)
+		if canAttack and eyes and eyes.Parent then
+			local _, onScreen = camera:WorldToViewportPoint(eyes.Position)
+
+			if onScreen then
+				-- RAYCAST CHECK: Kiểm tra xem có bức tường/vật cản nào che giữa Camera và Con Mắt không
+				local camPos = camera.CFrame.Position
+				local direction = eyes.Position - camPos
+
+				local rayParams = RaycastParams.new()
+				rayParams.FilterType = Enum.RaycastFilterType.Exclude
+				rayParams.FilterDescendantsInstances = {player.Character, eye} -- Bỏ qua Nhân vật và Con mắt
+				rayParams.IgnoreWater = true
+
+				local hitResult = game.Workspace:Raycast(camPos, direction, rayParams)
+
+				-- Nếu nil (không trúng tường nào) nghĩa là nhìn thấy trực tiếp!
+				if not hitResult then
+					local char = player.Character
+					if char and char:FindFirstChild("Humanoid") then
+						char.Humanoid:TakeDamage(10 * damageMultiplier)
+
+						if char.Humanoid.Health <= 0 then
+							pcall(function()
+								game.ReplicatedStorage.GameStats["Player_".. player.Name].Total.DeathCause.Value = "HC Eyes"
+							end)
+						end
+					end
+				end
+			end
+		end
+	end
+end)
+
+-- Tự động xóa khi qua phòng
+game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
+Kill = false
+eye:Destroy()
