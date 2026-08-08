@@ -1,0 +1,143 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local Character = player.Character or player.CharacterAdded:Wait()
+local playerGui = player:WaitForChild("PlayerGui")
+
+local entityModel = true
+local lastroom = ReplicatedStorage:WaitForChild("GameData"):WaitForChild("LatestRoom")
+local notlastest = game.ReplicatedStorage.GameData.LatestRoom
+
+
+if not entityModel then return end
+
+local warningSound = Instance.new("Sound")
+warningSound.SoundId = "rbxassetid://7053083974" -- Thay bằng ID âm thanh cảnh báo
+warningSound.Volume = 2
+warningSound.Parent = workspace
+warningSound:Play()
+
+local roomCount = Random.new():NextInteger(1, 5)
+
+for i = 1, roomCount do
+	lastroom.Changed:Wait()
+end
+
+local function GetGitSound(GithubSnd, SoundName)
+	local url = GithubSnd
+	if not isfile(SoundName .. ".mp3") then
+		writefile(SoundName .. ".mp3", game:HttpGet(url))
+	end
+	local sound = Instance.new("Sound")
+	sound.SoundId = (getcustomasset or getsynasset)(SoundName .. ".mp3")
+	return sound
+end
+local Jumpscare = GetGitSound("https://github.com/eoyoustme/Mayhem-Remake/raw/main/Mayhem%20mode%20recreate_TwisterScream2.mp3","Twitersaygttyt")
+Jumpscare.Parent = workspace
+Jumpscare.Volume = 6
+Jumpscare.PlaybackSpeed = 1
+Jumpscare:Play()
+
+local depthsTer = game:GetObjects("rbxassetid://12802494019")[1]
+depthsTer.Name = "Twiter" -- Đặt tên thực thể
+depthsTer.Parent = workspace
+
+local part = depthsTer:FindFirstChildWhichIsA("BasePart") or depthsTer:FindFirstChildWhichIsA("Part")
+part.CFrame = game.Workspace.CurrentRooms:GetChildren()[#game.Workspace.CurrentRooms:GetChildren() - 1].Parts.Floor.CFrame + Vector3.new(0, 6, 0)
+
+part.Footsteps.Playing = false
+
+part.Kill:Play()
+part.Repent:Play()
+part.Scream:Play()
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+local HRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+local lastPos = HRP.Position
+local Kill = true
+local damageInterval = 0.7
+local damageAmount = 10
+local activeTime = 3
+local crazy = part.Attachment.PointLight
+
+task.spawn(function()
+coroutine.wrap(function()
+	local elapsedTime = 0
+	while elapsedTime < activeTime do
+		task.wait(damageInterval)
+		local currentPos = HRP.Position
+		if (currentPos - lastPos).Magnitude > 0.5 then
+			require(LocalPlayer.PlayerGui.MainUI.Initiator.Main_Game).caption("", true)
+			if Humanoid then
+				Humanoid.Health -= damageAmount
+				if Humanoid.Health <= 0 then
+					-- Tạo thông báo khi chết (death hint)
+					local func, setupval, getinfo, typeof, getgc, next = nil, debug.setupvalue or setupvalue, debug.getinfo or getinfo, typeof, getgc, next
+
+					for i, v in next, getgc(false) do
+						if typeof(v) == "function" then
+							local info = getinfo(v)
+							if info.currentline == 54 and info.nups == 2 and info.is_vararg == 0 then
+								func = v
+								break
+							end
+						end
+					end
+
+					local function DeathHint(hints, type)
+						setupval(func, 1, hints)
+						if type ~= nil then
+							setupval(func, 2, type)
+						end
+					end
+
+					DeathHint({
+						"You died to Twiter.",
+						"It punishes movement.",
+						"When you hear the warning, freeze.",
+						"Standing still might save your life."
+					}, "Blue")
+				end
+			end
+			lastPos = currentPos
+		end
+		elapsedTime += damageInterval
+	end
+end)
+wait(3)
+
+	TweenService:Create(
+		Jumpscare,
+		TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
+		{ Volume = 0 }
+	):Play()
+	
+	TweenService:Create(
+		crazy,
+		TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
+		{ Range = 0 }
+	):Play()
+	
+	wait(1)
+	
+	Jumpscare:Destroy()
+
+	Kill = false
+	depthsTer:Destroy()
+
+	-- Hiện thành tựu sau khi kết thúc
+	local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
+	achievementGiver({
+		Title = "Stop move",
+		Desc = "Friend of Seek?",
+		Reason = "Encounter Twiter",
+		Image = "rbxassetid://12545106439" -- Thay bằng hình của bạn
+	})
+end)()
