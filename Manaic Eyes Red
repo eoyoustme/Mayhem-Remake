@@ -1,0 +1,80 @@
+local Kill = true
+local canAttack = true
+
+local eye = game:GetObjects("rbxassetid://82857301637364")[1]
+eye.Parent = game.Workspace
+eye.Name = "Maniac Eyes Blue"
+local eyes = eye:IsA("BasePart") and eye or (eye:FindFirstChildWhichIsA("BasePart", true) or eye.PrimaryPart)
+
+local currentRooms = game.Workspace.CurrentRooms:GetChildren()
+local floorCFrame = currentRooms[#currentRooms - 1].Parts.Floor.CFrame
+
+local randomY = math.random(0, 7)
+local randomX = math.random(5, 10) * (math.random(1, 2) == 1 and 1 or -1)
+local randomZ = math.random(5, 10) * (math.random(1, 2) == 1 and 1 or -1)
+
+local spawnCFrame = floorCFrame + Vector3.new(randomX, 7, randomZ)
+
+if eye:IsA("Model") then
+	eye:PivotTo(spawnCFrame)
+else
+	eyes.CFrame = spawnCFrame
+end
+
+local sound = Instance.new("Sound")
+sound.Parent = workspace
+sound.SoundId = "rbxassetid://1228230799"
+sound.Volume = 10
+sound.PlaybackSpeed = 1
+sound:Play()
+
+wait(2.038)
+
+local maniacEyes = game.Workspace:FindFirstChild("Manaic Eyes", true)
+
+if maniacEyes then
+	canAttack = false
+end
+
+task.wait(1.5)
+
+task.spawn(function()
+	local camera = game.Workspace.CurrentCamera
+	local player = game.Players.LocalPlayer
+
+	while Kill == true do
+		task.wait(0.05)
+		if canAttack and eyes and eyes.Parent then
+			local _, onScreen = camera:WorldToViewportPoint(eyes.Position)
+
+			if onScreen then
+				local camPos = camera.CFrame.Position
+				local direction = eyes.Position - camPos
+
+				local rayParams = RaycastParams.new()
+				rayParams.FilterType = Enum.RaycastFilterType.Exclude
+				rayParams.FilterDescendantsInstances = {player.Character, eye} 
+				rayParams.IgnoreWater = true
+
+				local hitResult = game.Workspace:Raycast(camPos, direction, rayParams)
+
+				if not hitResult then
+					local char = player.Character
+					if char and char:FindFirstChild("Humanoid") then
+						char.Humanoid:TakeDamage(2.02)
+
+						if char.Humanoid.Health <= 0 then
+							pcall(function()
+								game.ReplicatedStorage.GameStats["Player_".. player.Name].Total.DeathCause.Value = "Maniac Eyes Blue"
+							end)
+						end
+					end
+				end
+			end
+		end
+	end
+end)
+
+game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
+Kill = false
+eye:Destroy()
