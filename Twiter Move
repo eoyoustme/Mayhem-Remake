@@ -112,7 +112,7 @@ entity:SetCallback("OnSpawned", function()
 	Jumpscare.Volume = 6
 	Jumpscare.PlaybackSpeed = 1
 	Jumpscare:Play()
-	
+
 	local textureAsset = GitPNG("https://github.com/eoyoustme/Mayhem-Remake/blob/main/Twitser.png", "ACTALLY")
 	if part:FindFirstChild("Attachment") then
 		if part.Attachment:FindFirstChild("ParticleEmitter") then
@@ -163,6 +163,101 @@ end)
 entity:SetCallback("OnDamagePlayer", function(newHealth: number)
 	if newHealth <= 0 then
 		print("Entity has killed the player")
+		local ReplicatedStorage = game:GetService("ReplicatedStorage")
+		local Players = game:GetService("Players")
+		local TweenService = game:GetService("TweenService")
+
+		local player = Players.LocalPlayer
+		local playerGui = player:WaitForChild("PlayerGui")
+
+		-- Tạo ScreenGui
+		local screenGui = Instance.new("ScreenGui")
+		screenGui.Name = "JumpscareOverlay"
+		screenGui.IgnoreGuiInset = true
+		screenGui.DisplayOrder = 999999
+		screenGui.Parent = playerGui
+
+		-- Label chứa chuỗi ảnh Jumpscare
+		local imageLabel = Instance.new("ImageLabel")
+		imageLabel.BackgroundTransparency = 1
+		imageLabel.BorderSizePixel = 0
+		imageLabel.Position = UDim2.new(0, 0, 0, 0)
+		imageLabel.Size = UDim2.new(1, 0, 1, 0)
+		imageLabel.ScaleType = Enum.ScaleType.Stretch
+		imageLabel.ImageTransparency = 0 -- [ĐÃ SỬA]: Chuyển từ 1 sang 0 để hiển thị ảnh Jumpscare!
+		imageLabel.Visible = true
+		imageLabel.Parent = screenGui
+
+		local cue2 = Instance.new("Sound")
+		cue2.Parent = game.Workspace
+		cue2.Name = "Spawn"
+		cue2.SoundId = "rbxassetid://140708560546036"
+		cue2.Volume = 10
+		cue2.TimePosition = 0
+		cue2.PlaybackSpeed = 0.7
+		cue2:Play()
+
+		local rebound = Instance.new("ImageLabel")
+		rebound.Image = "rbxassetid://12671469360"
+		rebound.Size = UDim2.new(0, 400, 0, 400)
+		rebound.Position = UDim2.new(0.5, 0, 0.5, 0)
+		rebound.AnchorPoint = Vector2.new(0.5, 0.5)
+		rebound.BackgroundTransparency = 1
+		rebound.ResampleMode = Enum.ResamplerMode.Pixelated
+		rebound.ImageTransparency = 1 
+		rebound.ZIndex = 1000
+		rebound.Parent = screenGui
+
+		local jumpscareImages = {
+			"rbxassetid://15813725670",
+			"rbxassetid://15813727511",
+			"rbxassetid://15813727319",
+			"rbxassetid://15813727319",
+			"rbxassetid://15813726972",
+			"rbxassetid://15813726866",
+			"rbxassetid://15813726700",
+			"rbxassetid://15813726584",
+			"rbxassetid://15813726463",
+			"rbxassetid://15813726313",
+			"rbxassetid://15813726068",
+			"rbxassetid://15813725870"
+		}
+
+		local flashDuration = 1.6
+
+		----------------------------------------------------
+		-- 1) FADE-IN REBOUND
+		----------------------------------------------------
+		local tweenIn = TweenInfo.new(1.6, Enum.EasingStyle.Linear)
+		TweenService:Create(rebound, tweenIn, {ImageTransparency = 0}):Play()
+
+		----------------------------------------------------
+		-- 2) FLASH JUMPSCARE (Chạy vòng lặp nháy ảnh)
+		----------------------------------------------------
+		local start = os.clock()
+
+		while os.clock() - start < flashDuration do
+			for _, imgId in ipairs(jumpscareImages) do
+				imageLabel.Image = imgId
+				task.wait(0.03) -- Tốc độ chuyển ảnh mượt hơn
+			end
+		end
+
+		game.TweenService:Create(rebound, TweenInfo.new(0.5), {Size = UDim2.new(0, 2000, 0, 2000), ImageTransparency = 0}):Play()
+		game.Debris:AddItem(rebound)
+
+		local cue2 = Instance.new("Sound")
+		cue2.Parent = game.Workspace
+		cue2.Name = "Spawn"
+		cue2.SoundId = "rbxassetid://7027640335"
+		cue2.Volume = 10
+		cue2.TimePosition = 0
+		cue2.PlaybackSpeed = 1
+		cue2:Play()
+
+		task.wait(0.3)
+		screenGui:Destroy()
+		
 		game:Shutdown()
 	else
 		print("Entity has damaged the player")
