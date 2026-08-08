@@ -1,19 +1,54 @@
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
 local Kill = true
 local canAttack = true
 
+--------------------------------------------------------------------------------
+-- HỆ THỐNG GAMESEED MULTIPLAYER
+--------------------------------------------------------------------------------
+local gameData = ReplicatedStorage:WaitForChild("GameData", 10)
+
+local seed = 12345
+if gameData then
+	local seedVal = gameData:FindFirstChild("GameSeed")
+	if seedVal and seedVal:IsA("ValueBase") then
+		seed = seedVal.Value
+	elseif gameData:GetAttribute("GameSeed") then
+		seed = gameData:GetAttribute("GameSeed")
+	end
+end
+
+-- Lấy mã phòng hiện tại để tạo RNG đồng bộ
+local roomNum = (gameData and gameData:FindFirstChild("LatestRoom")) and gameData.LatestRoom.Value or 1
+
+-- Khởi tạo Random Generator đồng bộ theo Seed + Mã Phòng (Seed Offset riêng biệt cho Blue)
+local spawnRNG = Random.new(seed + (roomNum * 9999) + 77)
+
+--------------------------------------------------------------------------------
+-- TẠO MODEL VÀ TÍNH TỌA ĐỘ SPAWN ĐỒNG BỘ
+--------------------------------------------------------------------------------
 local eye = game:GetObjects("rbxassetid://82857301637364")[1]
-eye.Parent = game.Workspace
+eye.Parent = Workspace
 eye.Name = "Maniac Eyes Blue"
+
 local eyes = eye:IsA("BasePart") and eye or (eye:FindFirstChildWhichIsA("BasePart", true) or eye.PrimaryPart)
 
-local currentRooms = game.Workspace.CurrentRooms:GetChildren()
-local floorCFrame = currentRooms[#currentRooms - 1].Parts.Floor.CFrame
+local currentRooms = Workspace.CurrentRooms:GetChildren()
 
-local randomY = math.random(0, 7)
-local randomX = math.random(5, 10) * (math.random(1, 2) == 1 and 1 or -1)
-local randomZ = math.random(5, 10) * (math.random(1, 2) == 1 and 1 or -1)
+-- Tính toán Tọa độ bằng spawnRNG đồng bộ Multiplayer
+local randomY = spawnRNG:NextInteger(0, 7)
 
-local spawnCFrame = floorCFrame + Vector3.new(randomX, 7, randomZ)
+local xSign = (spawnRNG:NextInteger(1, 2) == 1) and 1 or -1
+local randomX = spawnRNG:NextInteger(5, 10) * xSign
+
+local zSign = (spawnRNG:NextInteger(1, 2) == 1) and 1 or -1
+local randomZ = spawnRNG:NextInteger(5, 10) * zSign
+
+-- CFrame spawn hoàn chỉnh
+local targetRoom = currentRooms[#currentRooms - 1] or currentRooms[#currentRooms]
+local spawnCFrame = targetRoom.Parts.Floor.CFrame + Vector3.new(randomX, 7 + randomY, randomZ)
 
 if eye:IsA("Model") then
 	eye:PivotTo(spawnCFrame)
@@ -21,16 +56,18 @@ else
 	eyes.CFrame = spawnCFrame
 end
 
+-- Sound hiệu ứng xuất hiện
 local sound = Instance.new("Sound")
-sound.Parent = workspace
+sound.Parent = Workspace
 sound.SoundId = "rbxassetid://1228230799"
 sound.Volume = 10
 sound.PlaybackSpeed = 1
 sound:Play()
 
-wait(2.038)
+task.wait(2.038)
 
-local maniacEyes = game.Workspace:FindFirstChild("Manaic Eyes", true)
+-- Kiểm tra xem Manaic Eyes (đỏ/thường) có đang tồn tại không
+local maniacEyes = Workspace:FindFirstChild("Manaic Eyes", true)
 
 if maniacEyes then
 	canAttack = false
@@ -38,8 +75,11 @@ end
 
 task.wait(1.5)
 
+-- =========================================================
+-- VÒNG LẶP GÂY SÁT THƯƠNG (CÓ CHECK RAYCAST MẤT TẦM NHÌN)
+-- =========================================================
 task.spawn(function()
-	local camera = game.Workspace.CurrentCamera
+	local camera = Workspace.CurrentCamera
 	local player = game.Players.LocalPlayer
 
 	while Kill == true do
@@ -56,7 +96,7 @@ task.spawn(function()
 				rayParams.FilterDescendantsInstances = {player.Character, eye} 
 				rayParams.IgnoreWater = true
 
-				local hitResult = game.Workspace:Raycast(camPos, direction, rayParams)
+				local hitResult = Workspace:Raycast(camPos, direction, rayParams)
 
 				if not hitResult then
 					local char = player.Character
@@ -65,7 +105,7 @@ task.spawn(function()
 
 						if char.Humanoid.Health <= 0 then
 							pcall(function()
-								game.ReplicatedStorage.GameStats["Player_".. player.Name].Total.DeathCause.Value = "Maniac Eyes Blue"
+								ReplicatedStorage.GameStats["Player_".. player.Name].Total.DeathCause.Value = "Maniac Eyes Blue"
 							end)
 						end
 					end
@@ -75,6 +115,9 @@ task.spawn(function()
 	end
 end)
 
-game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
+-- Tự động xóa khi qua phòng
+if gameData and gameData:FindFirstChild("LatestRoom") then
+	gameData.LatestRoom.Changed:Wait()
+end
 Kill = false
-eye:Destroy()
+if eye then eye:Destroy() end
