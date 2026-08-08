@@ -16,6 +16,22 @@ if not lastroom then
 	return 
 end
 
+--------------------------------------------------------------------------------
+-- HỆ THỐNG GAMESEED MULTIPLAYER (ĐỒNG BỘ CHO TẤT CẢ NGƯỜI CHƠI)
+--------------------------------------------------------------------------------
+local seed = 12345
+if gameData then
+	local seedVal = gameData:FindFirstChild("GameSeed")
+	if seedVal and seedVal:IsA("ValueBase") then
+		seed = seedVal.Value
+	elseif gameData:GetAttribute("GameSeed") then
+		seed = gameData:GetAttribute("GameSeed")
+	end
+end
+
+-- Lấy số phòng hiện tại để tạo Random Seed cố định cho lượt này
+local startRoomNum = lastroom.Value
+
 local oldmodel = workspace:FindFirstChild("Twiter")
 if oldmodel then
 	oldmodel:Destroy()
@@ -29,13 +45,15 @@ warningSound.Volume = 2
 warningSound.Parent = workspace
 warningSound:Play()
 
--- Chờ ngẫu nhiên từ 1 đến 5 phòng
-local initialRoomWait = Random.new():NextInteger(1, 5)
+-- [SỬA ĐỔI]: Chờ phòng đồng bộ theo GameSeed
+local syncRNG_Initial = Random.new(seed + (startRoomNum * 777) + 11)
+local initialRoomWait = syncRNG_Initial:NextInteger(1, 5)
+
 for i = 1, initialRoomWait do
 	lastroom.Changed:Wait()
 end
 
--- Tải âm thanh từ Github (Đã sửa lỗi Raw URL)
+-- Tải âm thanh từ Github
 local function GetGitSound(GithubSnd, SoundName)
 	local url = GithubSnd:gsub("github%.com", "raw.githubusercontent.com"):gsub("/blob/", "/"):gsub("%?raw=true", "")
 	local fileName = SoundName:sub(-4):lower() == ".mp3" and SoundName or (SoundName .. ".mp3")
@@ -136,6 +154,7 @@ local damageAmount = 10
 local activeTime = 3
 local crazy = part:FindFirstChild("Attachment") and part.Attachment:FindFirstChildOfClass("PointLight")
 
+-- Xử lý cơ chế đứng yên / gây sát thương khi di chuyển
 task.spawn(function()
 	local char = player.Character or player.CharacterAdded:Wait()
 	local hrp = char:WaitForChild("HumanoidRootPart", 5)
@@ -169,7 +188,6 @@ task.spawn(function()
 				humanoid.Health = math.max(0, humanoid.Health - damageAmount)
 
 				if humanoid.Health <= 0 then
-					-- Death Hint Safe Hook
 					pcall(function()
 						local setupval = debug.setupvalue or setupvalue
 						local getinfo = debug.getinfo or getinfo
@@ -225,8 +243,12 @@ task.spawn(function()
 	end)
 end) 
 
+-- Tiến trình Twiter Move: Đồng bộ Multiplayer theo GameSeed
 task.spawn(function()
-	local waitRooms = Random.new():NextInteger(1, 15)
+	-- [SỬA ĐỔI]: Tạo Random Seed đồng bộ cho tất cả người chơi
+	local syncRNG_Move1 = Random.new(seed + (startRoomNum * 1337) + 99)
+	local waitRooms = syncRNG_Move1:NextInteger(1, 15)
+
 	for i = 1, waitRooms do
 		lastroom.Changed:Wait()
 	end
@@ -235,7 +257,9 @@ task.spawn(function()
 		warningSound:Play()
 	end
 
-	local waitRooms2 = Random.new():NextInteger(1, 2)
+	local syncRNG_Move2 = Random.new(seed + (startRoomNum * 333) + 44)
+	local waitRooms2 = syncRNG_Move2:NextInteger(1, 1)
+
 	for i = 1, waitRooms2 do
 		lastroom.Changed:Wait()
 	end
