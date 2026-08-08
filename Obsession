@@ -1,0 +1,157 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+
+local entityModel = true
+local latestRoom = ReplicatedStorage.GameData.LatestRoom.Value
+
+if Workspace:FindFirstChild("SeekMovingNewClone") or 
+	latestRoom == 50 or latestRoom == 100 or  
+	(latestRoom >= 90 and latestRoom <= 100) then
+	entityModel = false
+end
+
+if not entityModel then return end
+
+local Kill = true
+local depthsTer = game:GetObjects("rbxassetid://86263076743619")[1]
+depthsTer.Parent = Workspace
+
+local part = depthsTer:FindFirstChildWhichIsA("BasePart") or depthsTer:FindFirstChildWhichIsA("Part")
+
+local currentRooms = Workspace.CurrentRooms:GetChildren()
+local lastRoom = currentRooms[#currentRooms - 1] or currentRooms[#currentRooms]
+part.CFrame = lastRoom.Parts.Floor.CFrame + Vector3.new(0, 6, 0)
+
+local function shouldTakeDamage()
+	local camera = Workspace.CurrentCamera
+	if not camera or not part then return false end
+
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+
+	local ignoreList = {depthsTer}
+	if LocalPlayer.Character then
+		table.insert(ignoreList, LocalPlayer.Character)
+	end
+	raycastParams.FilterDescendantsInstances = ignoreList
+
+	local origin = camera.CFrame.Position
+	local direction = (part.Position - origin)
+
+	local rayResult = Workspace:Raycast(origin, direction, raycastParams)
+
+	local hasLineOfSight = (not rayResult) or rayResult.Instance:IsDescendantOf(depthsTer)
+
+	if not hasLineOfSight then
+		return false
+	end
+
+	local _, onScreen = camera:WorldToViewportPoint(part.Position)
+
+	return not onScreen
+end
+
+task.wait(3)
+
+task.spawn(function()
+	while Kill and Humanoid and Humanoid.Health > 0 do
+		task.wait(0.1)
+
+		if shouldTakeDamage() then
+			Humanoid:TakeDamage(5)
+		end
+
+		if Humanoid.Health <= 0 then
+			part.PlaySound:Stop()
+			part.Footsteps:Stop()
+			part.Kill.Volume = 2
+			part.Repent.Volume = 2
+			part.Scream.Volume = 2
+			part.Kill:Play()
+			part.Repent:Play()
+			part.Scream:Play()
+			
+			local FLASH_COLOR = Color3.fromRGB(85, 170, 255) 
+			local FLASH_DURATION = 0.05 
+			local FLASH_REPEAT =  7
+
+			local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+			local screenGui = Instance.new("ScreenGui")
+			screenGui.Name = "FlashOverlay"
+			screenGui.IgnoreGuiInset = true
+			screenGui.Parent = playerGui
+
+			local frame = Instance.new("Frame")
+			frame.Size = UDim2.new(1, 0, 1, 0)
+			frame.BackgroundColor3 = FLASH_COLOR
+			frame.BackgroundTransparency = 1
+			frame.BorderSizePixel = 0
+			frame.Parent = screenGui
+
+			local rebound = Instance.new("ImageLabel")
+			rebound.Image = "rbxassetid://137196940810464"
+			rebound.Size = UDim2.new(0, 100, 0, 100)
+			rebound.Position = UDim2.new(0.5, 0, 0.5, 0)
+			rebound.AnchorPoint = Vector2.new(0.5, 0.5)
+			rebound.Parent = screenGui
+			rebound.BackgroundTransparency = 1
+			rebound.ResampleMode = Enum.ResamplerMode.Pixelated
+			rebound.ImageTransparency = 0
+			rebound.ZIndex = 1000
+			game.TweenService:Create(rebound, TweenInfo.new(1), {Size = UDim2.new(0, 2000, 0, 2000), ImageTransparency = 0}):Play()
+			game.Debris:AddItem(rebound)
+
+			for i = 1, FLASH_REPEAT do
+				frame.BackgroundTransparency = 0 -- Flash on
+				task.wait(FLASH_DURATION)
+				frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+				frame.BackgroundTransparency = 0 -- Flash off
+				task.wait(FLASH_DURATION)
+				frame.BackgroundColor3 = Color3.fromRGB(85, 255, 255)
+			end
+
+			screenGui:Destroy()
+			
+			part.PlaySound:Play()
+			part.Footsteps:Play()
+			
+			pcall(function()
+				-- Show death hint
+				firesignal(ReplicatedStorage.RemotesFolder.DeathHint.OnClientEvent, {
+					"You died to who you call Obsession...",
+					"He spawns in center of room and he will damage you if you dont look at him",
+					"He doesnt like to be ignored"
+				}, "Blue")
+
+				-- Update death cause
+				ReplicatedStorage.GameStats["Player_".. LocalPlayer.Name].Total.DeathCause.Value = "Obsession"
+			end)
+			break
+		end
+	end
+end)
+
+ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
+Kill = false
+
+if depthsTer and depthsTer.Parent then
+	depthsTer:Destroy()
+end
+
+---====== Load achievement giver ======---
+pcall(function()
+	local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
+
+	---====== Display achievement ======---
+	achievementGiver({
+		Title = "Look at me",
+		Desc = "Last chance to not look at me",
+		Reason = "Encounter Obsession",
+		Image = "rbxassetid://0"
+	})
+end)
