@@ -66,10 +66,31 @@ local entity = Spawner:Create({
 
 entity:SetCallback("OnSpawned", function()
 	print("Entity has spawned")
-end)
+	function GitPNG(GithubImg, ImageName)
+		local url = GithubImg:gsub("github%.com", "raw.githubusercontent.com"):gsub("/blob/", "/"):gsub("%?raw=true", "")
+		local fileName = ImageName:sub(-4):lower() == ".png" and ImageName or (ImageName .. ".png")
 
-entity:SetCallback("OnStartMoving", function()
-	print("Entity has started moving")
+		if not isfile(fileName) then
+			local success, response = pcall(function()
+				return game:HttpGet(url)
+			end)
+
+			if success and response and #response > 0 then
+				writefile(fileName, response)
+			else
+				warn("[GitPNG Error] Không thể tải ảnh: " .. tostring(url))
+				return ""
+			end
+		end
+
+		local getAsset = getcustomasset or getsynasset or syn_getcustomasset
+		if getAsset then
+			return getAsset(fileName)
+		else
+			return ""
+		end
+	end
+	wait(3)
 	local function GetGitSound(GithubSnd, SoundName)
 		local url = GithubSnd
 		if not isfile(SoundName .. ".mp3") then
@@ -79,6 +100,7 @@ entity:SetCallback("OnStartMoving", function()
 		sound.SoundId = (getcustomasset or getsynasset)(SoundName .. ".mp3")
 		return sound
 	end
+	local part = workspace.Twiter.ScreamNew
 	local Jumpscare = GetGitSound("https://github.com/eoyoustme/Mayhem-Remake/raw/main/Mayhem%20mode%20recreate_TwisterScream2.mp3","Twitersaygttyt")
 	Jumpscare.Parent = workspace.Twiter.ScreamNew
 	Jumpscare.Looped = true
@@ -90,6 +112,20 @@ entity:SetCallback("OnStartMoving", function()
 	Jumpscare.Volume = 6
 	Jumpscare.PlaybackSpeed = 1
 	Jumpscare:Play()
+	
+	local textureAsset = GitPNG("https://github.com/eoyoustme/Mayhem-Remake/blob/main/Twitser.png", "ACTALLY")
+	if part:FindFirstChild("Attachment") then
+		if part.Attachment:FindFirstChild("ParticleEmitter") then
+			part.Attachment.ParticleEmitter.Texture = textureAsset
+		end
+		if part.Attachment:FindFirstChild("BlackTrail") then
+			part.Attachment.BlackTrail.Texture = textureAsset
+		end
+	end
+end)
+
+entity:SetCallback("OnStartMoving", function()
+	print("Entity has started moving")
 end)
 
 entity:SetCallback("OnEnterRoom", function(room: Model, firstTime: boolean)
