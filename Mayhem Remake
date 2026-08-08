@@ -142,7 +142,7 @@ require(game.Players.LocalPlayer.PlayerGui.MainUI.Initiator.Main_Game).caption("
 
 game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
 
-require(game.Players.LocalPlayer.PlayerGui.MainUI.Initiator.Main_Game).caption("Mayhem Remake Mode active Now", true)
+require(game.Players.LocalPlayer.PlayerGui.MainUI.Initiator.Main_Game).caption("Mayhem Mode active Now", true)
 task.wait(2)
 require(game.Players.LocalPlayer.PlayerGui.MainUI.Initiator.Main_Game).caption("Credit to : OG HUNGER (NEW) Owner , LoVietnam (GroxMc Fake) : Artish", true)
 
@@ -173,7 +173,9 @@ local entityList = {
 	{ name = "Obsession", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Obsession", chance = 20 },
 	{ name = "Clock", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/AnnoyingClock", chance = 4 },
 	{ name = "Manaic Eyes Red", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Manaic%20Eyes%20Red", chance = 6 },
-	{ name = "Manaic Eyes", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Manaic%20Eyes", chance = 6 }
+	{ name = "Manaic Eyes", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Manaic%20Eyes", chance = 6 },
+	{ name = "Manaic Rush", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Manaic%20Rush", chance = 4 },
+	{ name = "Manaic Ambush", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Manaic%20Ambush", chance = 1.5 }
 }
 
 local function spawnEntity(entityData)
