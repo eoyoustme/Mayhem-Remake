@@ -1,0 +1,235 @@
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Camera = workspace.CurrentCamera
+
+local scriptStarted = false
+local menuExited = false
+
+-- 1. TẠO GUI HIỂN THỊ TRÊN CÙNG
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "MayhemStartMenu"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.DisplayOrder = 999999999 
+screenGui.Parent = PlayerGui
+
+local menuFrame = Instance.new("Frame")
+menuFrame.Size = UDim2.new(1, 0, 1, 0)
+menuFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+menuFrame.BackgroundTransparency = 0.3
+menuFrame.Parent = screenGui
+
+-- Tiêu đề
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(0, 400, 0, 80)
+titleLabel.Position = UDim2.new(0.5, -200, 0.25, 0)
+titleLabel.Text = "Mayhem Remake"
+titleLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
+titleLabel.TextSize = 38
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.BackgroundTransparency = 1
+titleLabel.Parent = menuFrame
+
+-- Nút Start
+local startBtn = Instance.new("TextButton")
+startBtn.Size = UDim2.new(0, 200, 0, 50)
+startBtn.Position = UDim2.new(0.5, -100, 0.45, 0)
+startBtn.Text = "Start"
+startBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+startBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 60)
+startBtn.TextSize = 22
+startBtn.Font = Enum.Font.GothamBold
+startBtn.Modal = true 
+startBtn.Parent = menuFrame
+
+local corner1 = Instance.new("UICorner")
+corner1.CornerRadius = UDim.new(0, 8)
+corner1.Parent = startBtn
+
+-- Nút Exit
+local exitBtn = Instance.new("TextButton")
+exitBtn.Size = UDim2.new(0, 200, 0, 50)
+exitBtn.Position = UDim2.new(0.5, -100, 0.57, 0)
+exitBtn.Text = "Exit"
+exitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+exitBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+exitBtn.TextSize = 22
+exitBtn.Font = Enum.Font.GothamBold
+exitBtn.Modal = true
+exitBtn.Parent = menuFrame
+
+local corner2 = Instance.new("UICorner")
+corner2.CornerRadius = UDim.new(0, 8)
+corner2.Parent = exitBtn
+
+local targetCFrame = CFrame.new(0, 50, 0) * CFrame.Angles(math.rad(-30), 0, 0)
+
+local currentRooms = workspace:FindFirstChild("CurrentRooms")
+if currentRooms and #currentRooms:GetChildren() > 0 then
+	local rooms = currentRooms:GetChildren()
+	local randomRoom = rooms[math.random(1, #rooms)]
+
+	local targetPart = randomRoom:FindFirstChild("RoomStart") 
+		or randomRoom:FindFirstChild("Nodes") 
+		or randomRoom.PrimaryPart 
+		or randomRoom:FindFirstChildWhichIsA("BasePart", true)
+
+	if targetPart then
+		local pos = targetPart.Position
+		targetCFrame = CFrame.lookAt(pos + Vector3.new(15, 20, 15), pos)
+	end
+elseif LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+	local rootPos = LocalPlayer.Character.HumanoidRootPart.Position
+	targetCFrame = CFrame.lookAt(rootPos + Vector3.new(12, 18, 12), rootPos)
+end
+
+local cameraLock = RunService.RenderStepped:Connect(function()
+	Camera.CameraType = Enum.CameraType.Scriptable
+	Camera.CFrame = targetCFrame
+
+	UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+	UserInputService.MouseIconEnabled = true
+end)
+
+startBtn.MouseButton1Click:Connect(function()
+	scriptStarted = true
+end)
+
+exitBtn.MouseButton1Click:Connect(function()
+	menuExited = true
+end)
+
+repeat task.wait() until scriptStarted or menuExited
+
+if cameraLock then
+	cameraLock:Disconnect()
+end
+
+local fadeFrame = Instance.new("Frame")
+fadeFrame.Size = UDim2.new(1, 0, 1, 0)
+fadeFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+fadeFrame.BackgroundTransparency = 1
+fadeFrame.ZIndex = 10
+fadeFrame.Parent = screenGui
+
+menuFrame.Visible = false
+
+local tweenIn = TweenService:Create(fadeFrame, TweenInfo.new(1), {BackgroundTransparency = 0})
+tweenIn:Play()
+tweenIn.Completed:Wait()
+
+if menuExited then
+	screenGui:Destroy()
+	return
+end
+
+Camera.CameraType = Enum.CameraType.Custom
+
+local tweenOut = TweenService:Create(fadeFrame, TweenInfo.new(1), {BackgroundTransparency = 1})
+tweenOut:Play()
+tweenOut.Completed:Wait()
+
+screenGui:Destroy()
+
+
+require(game.Players.LocalPlayer.PlayerGui.MainUI.Initiator.Main_Game).caption("Mode make by (Og Hunger(new)", true)
+
+game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
+
+require(game.Players.LocalPlayer.PlayerGui.MainUI.Initiator.Main_Game).caption("Mayhem Remake Mode active Now", true)
+task.wait(2)
+require(game.Players.LocalPlayer.PlayerGui.MainUI.Initiator.Main_Game).caption("Credit to : OG HUNGER (NEW) Owner , LoVietnam (GroxMc Fake) : Artish", true)
+
+local Lighting = game:GetService("Lighting")
+Lighting.Ambient = Color3.new(0, 0, 0)
+Lighting.Brightness = 3
+Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
+Lighting.FogEnd = 60
+Lighting.FogStart = 0
+Lighting.FogColor = Color3.new(0, 0, 0)
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local gameData = ReplicatedStorage:WaitForChild("GameData", 10)
+
+local seed = 12345
+if gameData then
+	local seedVal = gameData:FindFirstChild("GameSeed")
+	if seedVal and seedVal:IsA("ValueBase") then
+		seed = seedVal.Value
+	elseif gameData:GetAttribute("GameSeed") then
+		seed = gameData:GetAttribute("GameSeed")
+	end
+end
+
+local entityList = {
+	{ name = "Twiter",   url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Twitter",    chance = 10 },
+	{ name = "Threat",   url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Threat",     chance = 2 },
+	{ name = "Obsession", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Obsession", chance = 20 },
+	{ name = "Clock", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/AnnoyingClock", chance = 4 },
+	{ name = "Manaic Eyes Red", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Manaic%20Eyes%20Red", chance = 6 },
+	{ name = "Manaic Eyes", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Manaic%20Eyes", chance = 6 }
+}
+
+local function spawnEntity(entityData)
+	pcall(function()
+		loadstring(game:HttpGet(entityData.url))()
+	end)
+end
+
+local function IsSeekActive()
+	if workspace:FindFirstChild("SeekMoving") or workspace:FindFirstChild("SeekMovingNewClone") then
+		return true
+	end
+
+	local currentRooms = workspace:FindFirstChild("CurrentRooms")
+	if currentRooms then
+		for _, room in ipairs(currentRooms:GetChildren()) do
+			if room:FindFirstChild("SeekFolder") then
+				return true
+			end
+		end
+	end
+
+	return false
+end
+
+local checkedRooms = {}
+
+local function checkAndSpawnEntity(roomNum)
+	if IsSeekActive() then return end
+	if checkedRooms[roomNum] then return end
+	checkedRooms[roomNum] = true
+
+	for idx, entityData in ipairs(entityList) do
+		local roomRNG = Random.new(seed + (roomNum * 1337) + (idx * 42))
+		local roll = roomRNG:NextNumber(0, 100)
+
+		if roll <= entityData.chance then
+			task.spawn(function()
+				local spawnDelay = roomRNG:NextNumber(5, 8)
+				task.wait(spawnDelay)
+
+				if not IsSeekActive() then
+					spawnEntity(entityData)
+				end
+			end)
+		end
+	end
+end
+
+-- Theo dõi chuyển phòng
+if gameData and gameData:FindFirstChild("LatestRoom") then
+	gameData.LatestRoom.Changed:Connect(function(newRoom)
+		checkAndSpawnEntity(newRoom)
+	end)
+
+	if gameData.LatestRoom.Value > 0 then
+		checkAndSpawnEntity(gameData.LatestRoom.Value)
+	end
+end
