@@ -1,0 +1,185 @@
+---====== Load spawner ======---
+
+local Spawner = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/DOORS-Entity-Spawner-V2/main/init.luau"))()
+
+---====== Create entity ======---
+
+local entity = Spawner:Create({
+	Entity = {
+		Name = "Manaic Ambush",
+		Asset = "rbxassetid://12802569171",
+		HeightOffset = 0
+	},
+	Lights = {
+		Flicker = {
+			Enabled = false,
+			Duration = 1
+		},
+		Shatter = true,
+		Repair = false
+	},
+	Earthquake = {
+		Enabled = true
+	},
+	CameraShake = {
+		Enabled = true,
+		Range = 100,
+		Values = {1.5, 20, 0.1, 1} -- Magnitude, Roughness, FadeIn, FadeOut
+	},
+	Movement = {
+		Speed = 400,
+		Delay = 6,
+		Reversed = false
+	},
+	Rebounding = {
+		Enabled = true,
+		Type = "Ambush",
+		Min = 1,
+		Max = 4,
+		Delay = 2
+	},
+	Damage = {
+		Enabled = true,
+		Range = 40,
+		Amount = 0.01
+	},
+	Crucifixion = {
+		Enabled = true,
+		Range = 40,
+		Resist = false,
+		Break = true
+	},
+	Death = {
+		Type = "Guiding", -- "Curious"
+		Hints = {"", "", "", ""},
+		Cause = ""
+	}
+})
+
+---====== Debug entity ======---
+
+entity:SetCallback("OnSpawned", function()
+	print("Entity has spawned")
+	local cue2 = Instance.new("Sound")
+	cue2.Name = "Spawn"
+	cue2.SoundId = "rbxassetid://134020218579308"
+	cue2.Volume = 5  -- Giảm volume lại cho an toàn
+	cue2.PlaybackSpeed = 1
+	cue2.Parent = workspace
+	cue2:Play()
+end)
+
+entity:SetCallback("OnStartMoving", function()
+	print("Entity has started moving")
+end)
+
+entity:SetCallback("OnEnterRoom", function(room: Model, firstTime: boolean)
+	if firstTime == true then
+		print("Entity has entered room: ".. room.Name.. " for the first time")
+	else
+		print("Entity has entered room: ".. room.Name.. " again")
+	end
+end)
+
+entity:SetCallback("OnLookAt", function(lineOfSight: boolean)
+	if lineOfSight == true then
+		print("Player is looking at entity")
+	else
+		print("Player view is obstructed by something")
+	end
+end)
+
+entity:SetCallback("OnRebounding", function(startOfRebound: boolean)
+	if startOfRebound == true then
+		print("Entity has started rebounding")
+	else
+		print("Entity has finished rebounding")
+	end
+end)
+
+entity:SetCallback("OnDespawning", function()
+	print("Entity is despawning")
+end)
+
+entity:SetCallback("OnDespawned", function()
+	print("Entity has despawned")
+end)
+
+entity:SetCallback("OnDamagePlayer", function(newHealth: number)
+	if newHealth <= 0 then
+		print("Entity has killed the player")
+	else
+		print("Entity has damaged the player")
+		entity:Pause()
+		local workspace = game:GetService("Workspace")
+		local Players = game:GetService("Players")
+		local LocalPlayer = Players.LocalPlayer
+		local playerGui = LocalPlayer:WaitForChild("PlayerGui", 10)
+		if not playerGui then return end
+
+		local mainUI = playerGui:FindFirstChild("MainUI")
+		if not mainUI then return end
+
+		local jumpscareRush = mainUI:FindFirstChild("Jumpscare") and mainUI.Jumpscare:FindFirstChild("Jumpscare_Ambush")
+		if not jumpscareRush then return end
+
+		local imageLabel = jumpscareRush:FindFirstChild("ImageLabel")
+		local imageLabelBig = jumpscareRush:FindFirstChild("ImageLabelBig")
+
+		if imageLabel then
+			imageLabel.ImageColor3 = Color3.fromRGB(255, 170, 0)
+			imageLabel.Image = "rbxassetid://11846426821"
+		end
+		
+		if imageLabel then
+			task.spawn(function()
+				local origin = imageLabel.Position
+				local delayTime = 0.05
+				local delayTime2 = 0.025
+
+				while imageLabel and imageLabel.Parent do
+					jumpscareRush.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+					task.wait(delayTime2) 
+					jumpscareRush.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
+					task.wait(delayTime2) 
+				end
+			end)
+		end
+
+		-- Kích hoạt Jumpscare Rush an toàn
+		pcall(function()
+			local main_game = require(LocalPlayer.PlayerGui.MainUI.Initiator.Main_Game)
+			require(LocalPlayer.PlayerGui.MainUI.Initiator.Main_Game.RemoteListener.Jumpscares.Ambush)(main_game)
+		end)
+
+		-- Trừ máu nhân vật an toàn
+		local character = LocalPlayer.Character
+		if character then
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				humanoid.Health = math.max(0, humanoid.Health - 1000)
+				entity:Resume()
+			end
+		end
+
+		-- Đặt nguyên nhân cái chết
+		pcall(function()
+			game:GetService("ReplicatedStorage").GameStats["Player_".. LocalPlayer.Name].Total.DeathCause.Value = "Manaic Ambush"
+		end)
+	end
+end)
+
+--[[
+
+DEVELOPER NOTE:
+By overwriting 'CrucifixionOverwrite' the default crucifixion callback will be replaced with your custom callback.
+
+entity:SetCallback("CrucifixionOverwrite", function()
+    print("Custom crucifixion callback")
+end)
+
+]]--
+
+---====== Run entity ======---
+
+entity:Run(true)
