@@ -1,5 +1,5 @@
 local warningSound = Instance.new("Sound")
-warningSound.SoundId = "rbxassetid://6314880174" -- Thay bằng ID âm thanh cảnh báo của bạn
+warningSound.SoundId = "rbxassetid://6314880174" 
 warningSound.Volume = 2
 warningSound.Parent = workspace
 warningSound:Play()
@@ -19,13 +19,13 @@ local entity = Spawner:Create({
 	Lights = {
 		Flicker = {
 			Enabled = true,
-			Duration = 1
+			Duration = 3
 		},
 		Shatter = true,
 		Repair = false
 	},
 	Earthquake = {
-		Enabled = true
+		Enabled = false
 	},
 	CameraShake = {
 		Enabled = true,
