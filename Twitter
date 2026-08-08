@@ -16,6 +16,12 @@ if not lastroom then
 	return 
 end
 
+local oldmodel = workspace:FindFirstChild("Twiter")
+if oldmodel then
+	oldmodel:Destroy()
+	return
+end
+
 -- Âm thanh cảnh báo ban đầu
 local warningSound = Instance.new("Sound")
 warningSound.SoundId = "rbxassetid://7053083974" 
