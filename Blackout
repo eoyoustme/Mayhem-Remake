@@ -125,7 +125,7 @@ if moveDetected then
 	screenGui:Destroy()
 	imageLabel:Destroy()
 	background:Destroy()
-	humanoid:TakeDamage(100)
+	humanoid:TakeDamage(20)
 	static:Destroy()
 
 	local stats = game.ReplicatedStorage:FindFirstChild("GameStats")
