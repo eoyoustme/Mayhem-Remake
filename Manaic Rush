@@ -1,3 +1,5 @@
+local thread = nil
+local threada = nil
 ---====== Load spawner ======---
 
 local Spawner = loadstring(game:HttpGet("https://raw.githubusercontent.com/eoyoustme/Hardcore/refs/heads/main/Deer%20god%20spawner"))()
@@ -64,7 +66,7 @@ end)
 
 entity:SetCallback("OnStartMoving", function()
 	print("Entity has started moving")
-	task.spawn(function()
+	thread = task.spawn(function()
 		while true do
 			task.wait(0.3)
 			
@@ -182,6 +184,15 @@ end)
 
 entity:SetCallback("OnDespawning", function()
 	print("Entity is despawning")
+	if thread then
+		task.cancel(thread)
+		thread = nil
+	end
+	
+	if threada then
+		task.cancel(threada)
+		threada = nil
+	end
 end)
 
 entity:SetCallback("OnDespawned", function()
