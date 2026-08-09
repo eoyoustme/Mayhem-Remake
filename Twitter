@@ -3,6 +3,25 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local function GetGitSound(GithubSnd, SoundName)
+	local url = GithubSnd:gsub("github%.com", "raw.githubusercontent.com"):gsub("/blob/", "/"):gsub("%?raw=true", "")
+	local fileName = SoundName:sub(-4):lower() == ".mp3" and SoundName or (SoundName .. ".mp3")
+
+	if not isfile(fileName) then
+		pcall(function()
+			writefile(fileName, game:HttpGet(url))
+		end)
+	end
+
+	local sound = Instance.new("Sound")
+	local getAsset = getcustomasset or getsynasset or syn_getcustomasset
+	if getAsset and isfile(fileName) then
+		sound.SoundId = getAsset(fileName)
+	else
+		sound.SoundId = url
+	end
+	return sound
+end
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui", 10)
@@ -37,13 +56,25 @@ if oldmodel then
 	oldmodel:Destroy()
 	return
 end
-
--- Âm thanh cảnh báo ban đầu
-local warningSound = Instance.new("Sound")
-warningSound.SoundId = "rbxassetid://7053083974" 
-warningSound.Volume = 2
+local warningSound = GetGitSound("https://github.com/eoyoustme/Mayhem-Remake/blob/main/SUPERSCREAM.mp3?raw=true", "SUPERSCREAMWAWA")
 warningSound.Parent = workspace
+warningSound.Volume = 2
+warningSound.TimePosition = 0.3
+warningSound.PlaybackSpeed = 1
 warningSound:Play()
+
+local warningSound55 = GetGitSound("https://github.com/eoyoustme/Mayhem-Remake/blob/main/Twister111.mp3?raw=true", "1.1.1.1")
+warningSound55.Parent = workspace
+warningSound55.Volume = 2
+warningSound55.TimePosition = 0.3
+warningSound55.PlaybackSpeed = 1
+warningSound55:Play()
+
+local warningSound5 = GetGitSound("https://github.com/eoyoustme/Mayhem-Remake/blob/main/Twister%20(1).mp3?raw=true", "warningSoundwarningSound")
+warningSound5.Parent = workspace
+warningSound5.Volume = 2
+warningSound5.PlaybackSpeed = 1
+warningSound5:Play()
 
 -- [SỬA ĐỔI]: Chờ phòng đồng bộ theo GameSeed
 local syncRNG_Initial = Random.new(seed + (startRoomNum * 777) + 11)
@@ -53,26 +84,7 @@ for i = 1, initialRoomWait do
 	lastroom.Changed:Wait()
 end
 
--- Tải âm thanh từ Github
-local function GetGitSound(GithubSnd, SoundName)
-	local url = GithubSnd:gsub("github%.com", "raw.githubusercontent.com"):gsub("/blob/", "/"):gsub("%?raw=true", "")
-	local fileName = SoundName:sub(-4):lower() == ".mp3" and SoundName or (SoundName .. ".mp3")
-
-	if not isfile(fileName) then
-		pcall(function()
-			writefile(fileName, game:HttpGet(url))
-		end)
-	end
-
-	local sound = Instance.new("Sound")
-	local getAsset = getcustomasset or getsynasset or syn_getcustomasset
-	if getAsset and isfile(fileName) then
-		sound.SoundId = getAsset(fileName)
-	else
-		sound.SoundId = url
-	end
-	return sound
-end
+-- Tải âm thanh từ Githu
 
 local Jumpscare = GetGitSound("https://github.com/eoyoustme/Mayhem-Remake/raw/main/Mayhem%20mode%20recreate_TwisterScream2.mp3", "Twitersaygttyt")
 Jumpscare.Parent = workspace
@@ -231,16 +243,6 @@ task.spawn(function()
 	if Jumpscare then Jumpscare:Destroy() end
 	if depthsTer then depthsTer:Destroy() end
 
-	-- Custom Achievement
-	pcall(function()
-		local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
-		achievementGiver({
-			Title = "Stop move",
-			Desc = "Friend of Seek?",
-			Reason = "Encounter Twiter",
-			Image = "rbxassetid://12545106439"
-		})
-	end)
 end) 
 
 -- Tiến trình Twiter Move: Đồng bộ Multiplayer theo GameSeed
@@ -255,6 +257,8 @@ task.spawn(function()
 
 	if warningSound and warningSound.Parent then
 		warningSound:Play()
+		warningSound5:Play()
+		warningSound55:Play()
 	end
 
 	local syncRNG_Move2 = Random.new(seed + (startRoomNum * 333) + 44)
