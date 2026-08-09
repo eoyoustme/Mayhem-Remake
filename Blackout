@@ -1,4 +1,4 @@
-
+game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
 local static = Instance.new("Sound")
 static.SoundId = "rbxassetid://18870782376"
 static.Parent = game.Workspace
