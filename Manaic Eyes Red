@@ -5,9 +5,6 @@ local Workspace = game:GetService("Workspace")
 local Kill = true
 local canAttack = true
 
---------------------------------------------------------------------------------
--- HỆ THỐNG GAMESEED MULTIPLAYER
---------------------------------------------------------------------------------
 local gameData = ReplicatedStorage:WaitForChild("GameData", 10)
 
 local seed = 12345
@@ -20,15 +17,10 @@ if gameData then
 	end
 end
 
--- Lấy mã phòng hiện tại để tạo RNG đồng bộ
 local roomNum = (gameData and gameData:FindFirstChild("LatestRoom")) and gameData.LatestRoom.Value or 1
 
--- Khởi tạo Random Generator đồng bộ theo Seed + Mã Phòng (Seed Offset riêng biệt cho Blue)
 local spawnRNG = Random.new(seed + (roomNum * 9999) + 77)
 
---------------------------------------------------------------------------------
--- TẠO MODEL VÀ TÍNH TỌA ĐỘ SPAWN ĐỒNG BỘ
---------------------------------------------------------------------------------
 local eye = game:GetObjects("rbxassetid://82857301637364")[1]
 eye.Parent = Workspace
 eye.Name = "Maniac Eyes Blue"
@@ -37,7 +29,6 @@ local eyes = eye:IsA("BasePart") and eye or (eye:FindFirstChildWhichIsA("BasePar
 
 local currentRooms = Workspace.CurrentRooms:GetChildren()
 
--- Tính toán Tọa độ bằng spawnRNG đồng bộ Multiplayer
 local randomY = spawnRNG:NextInteger(0, 7)
 
 local xSign = (spawnRNG:NextInteger(1, 2) == 1) and 1 or -1
@@ -46,7 +37,6 @@ local randomX = spawnRNG:NextInteger(5, 10) * xSign
 local zSign = (spawnRNG:NextInteger(1, 2) == 1) and 1 or -1
 local randomZ = spawnRNG:NextInteger(5, 10) * zSign
 
--- CFrame spawn hoàn chỉnh
 local targetRoom = currentRooms[#currentRooms - 1] or currentRooms[#currentRooms]
 local spawnCFrame = targetRoom.Parts.Floor.CFrame + Vector3.new(randomX, 7 + randomY, randomZ)
 
@@ -56,28 +46,83 @@ else
 	eyes.CFrame = spawnCFrame
 end
 
--- Sound hiệu ứng xuất hiện
 local sound = Instance.new("Sound")
 sound.Parent = Workspace
-sound.SoundId = "rbxassetid://1228230799"
+sound.SoundId = "rbxassetid://1168009240"
 sound.Volume = 10
 sound.PlaybackSpeed = 1
 sound:Play()
 
+local moveRayParams = RaycastParams.new()
+moveRayParams.FilterType = Enum.RaycastFilterType.Exclude
+moveRayParams.IgnoreWater = true
+
+local moveDirection = Vector3.new(
+	spawnRNG:NextNumber(-1, 1),
+	spawnRNG:NextNumber(-0.3, 0.3),
+	spawnRNG:NextNumber(-1, 1)
+).Unit
+
+if moveDirection.Magnitude == 0 then
+	moveDirection = Vector3.new(1, 0, 1).Unit
+end
+
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+
+local moveConnection
+moveConnection = RunService.Heartbeat:Connect(function(dt)
+	if not Kill or not eyes or not eyes.Parent then
+		if moveConnection then moveConnection:Disconnect() end
+		return
+	end
+
+	if not canAttack then return end
+
+	local player = Players.LocalPlayer
+	local char = player and player.Character
+	moveRayParams.FilterDescendantsInstances = {eye, char}
+
+	local currentPos = eyes.Position
+	local moveDistance = 12 * dt
+	local deltaVector = moveDirection * moveDistance
+
+	local hitResult = Workspace:Raycast(currentPos, deltaVector + (moveDirection * 0.8), moveRayParams)
+
+	if hitResult then
+		local normal = hitResult.Normal
+		moveDirection = (moveDirection - 2 * moveDirection:Dot(normal) * normal).Unit
+
+		local newPos = hitResult.Position + (normal * 0.2)
+		if eye:IsA("Model") then
+			eye:PivotTo(CFrame.new(newPos))
+		else
+			eyes.CFrame = CFrame.new(newPos)
+		end
+	else
+		local newPos = currentPos + deltaVector
+		if eye:IsA("Model") then
+			eye:PivotTo(CFrame.new(newPos))
+		else
+			eyes.CFrame = CFrame.new(newPos)
+		end
+	end
+end)
+
 task.wait(2.038)
 
--- Kiểm tra xem Manaic Eyes (đỏ/thường) có đang tồn tại không
 local maniacEyes = Workspace:FindFirstChild("Manaic Eyes", true)
 
 if maniacEyes then
+	moveConnection:Disconnect()
 	canAttack = false
 end
 
 task.wait(1.5)
 
--- =========================================================
--- VÒNG LẶP GÂY SÁT THƯƠNG (CÓ CHECK RAYCAST MẤT TẦM NHÌN)
--- =========================================================
 task.spawn(function()
 	local camera = Workspace.CurrentCamera
 	local player = game.Players.LocalPlayer
@@ -115,7 +160,6 @@ task.spawn(function()
 	end
 end)
 
--- Tự động xóa khi qua phòng
 if gameData and gameData:FindFirstChild("LatestRoom") then
 	gameData.LatestRoom.Changed:Wait()
 end
