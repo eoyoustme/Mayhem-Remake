@@ -1,4 +1,3 @@
-
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -11,7 +10,6 @@ local Camera = workspace.CurrentCamera
 local scriptStarted = false
 local menuExited = false
 
--- 1. TẠO GUI HIỂN THỊ TRÊN CÙNG
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MayhemStartMenu"
 screenGui.ResetOnSpawn = false
@@ -25,44 +23,51 @@ menuFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 menuFrame.BackgroundTransparency = 0.3
 menuFrame.Parent = screenGui
 
--- Tiêu đề
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(0, 400, 0, 80)
 titleLabel.Position = UDim2.new(0.5, -200, 0.25, 0)
 titleLabel.Text = "Mayhem Remake"
-titleLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
-titleLabel.TextSize = 38
-titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextColor3 = Color3.fromRGB(127, 127, 127)
+titleLabel.TextSize = 80
+titleLabel.Font = Enum.Font.AmaticSC
 titleLabel.BackgroundTransparency = 1
 titleLabel.Parent = menuFrame
 
--- Nút Start
 local startBtn = Instance.new("TextButton")
 startBtn.Size = UDim2.new(0, 200, 0, 50)
 startBtn.Position = UDim2.new(0.5, -100, 0.45, 0)
 startBtn.Text = "Start"
 startBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-startBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 60)
+startBtn.BackgroundColor3 = Color3.fromRGB(170, 170, 170)
 startBtn.TextSize = 22
 startBtn.Font = Enum.Font.GothamBold
 startBtn.Modal = true 
 startBtn.Parent = menuFrame
 
+local uistroke = Instance.new("UIStroke")
+uistroke.Color = Color3.fromRGB(0, 0, 0)
+uistroke.Thickness = 5
+uistroke.Parent = startBtn
+
 local corner1 = Instance.new("UICorner")
 corner1.CornerRadius = UDim.new(0, 8)
 corner1.Parent = startBtn
 
--- Nút Exit
 local exitBtn = Instance.new("TextButton")
 exitBtn.Size = UDim2.new(0, 200, 0, 50)
 exitBtn.Position = UDim2.new(0.5, -100, 0.57, 0)
 exitBtn.Text = "Exit"
 exitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-exitBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+exitBtn.BackgroundColor3 = Color3.fromRGB(170, 170, 170)
 exitBtn.TextSize = 22
 exitBtn.Font = Enum.Font.GothamBold
 exitBtn.Modal = true
 exitBtn.Parent = menuFrame
+
+local uistroke = Instance.new("UIStroke")
+uistroke.Color = Color3.fromRGB(0, 0, 0)
+uistroke.Thickness = 5
+uistroke.Parent = exitBtn
 
 local corner2 = Instance.new("UICorner")
 corner2.CornerRadius = UDim.new(0, 8)
@@ -176,7 +181,8 @@ local entityList = {
 	{ name = "Manaic Eyes", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Manaic%20Eyes", chance = 6 },
 	{ name = "Manaic Rush", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Manaic%20Rush", chance = 4 },
 	{ name = "Manaic Ambush", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Manaic%20Ambush", chance = 1.5 },
-	{ name = "Stalker", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Stalker", chance = 25}
+	{ name = "Stalker", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Stalker", chance = 15},
+	{ name = "Blackout", url = "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/Blackout", chance = 7.5}
 }
 
 local function spawnEntity(entityData)
