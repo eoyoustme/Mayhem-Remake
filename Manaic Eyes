@@ -158,7 +158,7 @@ task.spawn(function()
 
 						if char.Humanoid.Health <= 0 then
 							pcall(function()
-								ReplicatedStorage.GameStats["Player_".. player.Name].Total.DeathCause.Value = "HC Eyes"
+								ReplicatedStorage.GameStats["Player_".. player.Name].Total.DeathCause.Value = "Manaic Eyes"
 							end)
 						end
 					end
