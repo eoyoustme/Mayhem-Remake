@@ -1,0 +1,177 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+
+local gameData = ReplicatedStorage:WaitForChild("GameData")
+local latestRoom = gameData:WaitForChild("LatestRoom")
+local floor = gameData:WaitForChild("Floor")
+
+latestRoom.Changed:Connect(function(roomValue)
+	if floor.Value == "Hotel" and roomValue == 50 then
+		local entityModel = nil
+
+		local cofingae = {
+			Name = "Fog",
+			HeightOffset = 2
+		}
+
+		local function EntityMoveTo(targetCFrame)
+			if not entityModel or not entityModel.Parent then return end
+			local reached = false
+			local connection
+
+			connection = RunService.Stepped:Connect(function(_, step)
+				if not entityModel or not entityModel.Parent then 
+					if connection then connection:Disconnect() end
+					reached = true 
+					return 
+				end
+
+				local pivot = entityModel:GetPivot()
+				local difference = (targetCFrame.Position - pivot.Position)
+
+				if difference.Magnitude > 0.8 then
+					local unit = difference.Unit
+					entityModel:PivotTo(pivot + unit * math.min(step * 50, difference.Magnitude))
+				else
+					if connection then connection:Disconnect() end
+					reached = true
+				end
+			end)
+
+			local start = os.clock()
+			repeat RunService.Stepped:Wait() until reached or (os.clock() - start > 12)
+			if connection then connection:Disconnect() end
+		end
+
+		local function Lol()
+			local rooms = Workspace:FindFirstChild("CurrentRooms")
+			if rooms then
+				local room50 = rooms:FindFirstChild("50") or rooms:FindFirstChild("Room50")
+				if room50 and room50:FindFirstChild("RoomStart") then
+					return room50.RoomStart.CFrame
+				end
+			end
+			return CFrame.new(0, 5, 0)
+		end
+
+		local function Fastest()
+			local pathFolder = Workspace:FindFirstChild("FigureNodes", true)
+			if not pathFolder then 
+				task.wait(1)
+				return false
+			end
+
+			local nodes = pathFolder:GetChildren()
+			table.sort(nodes, function(a, b)
+				local numA = tonumber(a.Name:match("%d+")) or 0
+				local numB = tonumber(b.Name:match("%d+")) or 0
+				return numA < numB
+			end)
+
+			for _, node in ipairs(nodes) do
+				if not entityModel or not entityModel.Parent then return false end
+				if node:IsA("BasePart") then
+					EntityMoveTo(node.CFrame + Vector3.new(0, cofingae.HeightOffset, 0))
+				end
+			end
+
+			if not entityModel or not entityModel.Parent then return false end
+			EntityMoveTo(Lol())
+			return true
+		end
+
+		-- Hàm kiểm tra va chạm & gây sát thương
+		local function Gex(model)
+			task.spawn(function()
+				while task.wait(0.1) do
+					if not model or not model.Parent then break end
+
+					local part = model:FindFirstChild("FogMonster") or model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+
+					local rushNew = model:FindFirstChild("RushNew")
+					if rushNew and rushNew:IsA("BasePart") then
+						rushNew.CanCollide = false
+					end
+
+					local player = Players.LocalPlayer
+					local char = player.Character
+					local hum = char and char:FindFirstChildOfClass("Humanoid")
+					local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+					if part and hum and hrp and hum.Health > 0 then
+						if (hrp.Position - part.Position).Magnitude <= 9 then
+							hum.Health = 0
+						end
+					end
+				end
+			end)
+		end
+
+		-- Hiệu ứng sương mù
+		local function eventfog()
+			Lighting.FogEnd = 150
+			Lighting.FogStart = 0
+			Lighting.FogColor = Color3.new(1, 1, 1)
+			task.wait(15)
+
+			Lighting.FogEnd = 50
+			task.wait(1)
+
+			Lighting.FogEnd = 150
+			task.wait(1)
+
+			Lighting.FogEnd = 50
+			task.wait(1)
+		end
+
+		local function initEntity()
+			local objects = game:GetObjects("rbxassetid://12802386940")
+			if not objects or #objects == 0 then return end
+
+			entityModel = objects[1]
+			entityModel.Name = cofingae.Name
+			entityModel.Parent = Workspace
+
+			for _, part in ipairs(entityModel:GetDescendants()) do
+				if part:IsA("BasePart") then
+					part.CanCollide = false
+					part.Massless = true
+				end
+			end
+
+			-- ĐÃ SỬA: Sửa Lol()() thành Lol()
+			local entranceCFrame = Lol()
+			local hiddenSpawnCFrame = entranceCFrame + (entranceCFrame.LookVector * 2.5) + Vector3.new(0, 2, 0)
+			entityModel:PivotTo(hiddenSpawnCFrame)
+
+			Gex(entityModel)
+
+			-- Chạy hiệu ứng sương mù song song để không làm kẹt tuần tra
+			task.spawn(eventfog)
+
+			task.wait(3)
+
+			for i = 1, 100000 do
+				print("Starting patrol loop count: " .. i)
+				local success = Fastest()
+				if not success then break end
+			end
+
+			print("Entity is despawning")
+			if entityModel then
+				entityModel:Destroy()
+				entityModel = nil
+			end
+		end
+
+		initEntity()
+
+		-- Reset Lighting sau khi hoàn tất
+		Lighting.FogEnd = 60
+		Lighting.FogStart = 0
+		Lighting.FogColor = Color3.new(0, 0, 0)
+	end
+end)
