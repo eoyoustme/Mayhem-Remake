@@ -34,7 +34,7 @@ latestRoom.Changed:Connect(function(roomValue)
 
 				if difference.Magnitude > 0.8 then
 					local unit = difference.Unit
-					entityModel:PivotTo(pivot + unit * math.min(step * 50, difference.Magnitude))
+					entityModel:PivotTo(pivot + unit * math.min(step * 20, difference.Magnitude))
 				else
 					if connection then connection:Disconnect() end
 					reached = true
