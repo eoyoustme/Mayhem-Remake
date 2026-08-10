@@ -1,5 +1,5 @@
 local warningSound = Instance.new("Sound")
-warningSound.SoundId = "rbxassetid://6314880174" 
+warningSound.SoundId = "rbxasset://textures/be8caa3e9b2df8d2dfeeb43edd94d468c6632d68a7959df5861bc5650311d512.mp3" 
 warningSound.Volume = 2
 warningSound.Parent = workspace
 warningSound:Play()
@@ -225,31 +225,35 @@ entity:SetCallback("OnDamagePlayer", function(newHealth: number)
 
 		local flashDuration = 1.6
 
-		----------------------------------------------------
-		-- 1) FADE-IN REBOUND
-		----------------------------------------------------
 		local tweenIn = TweenInfo.new(1.6, Enum.EasingStyle.Linear)
 		TweenService:Create(rebound, tweenIn, {ImageTransparency = 0}):Play()
 
-		----------------------------------------------------
-		-- 2) FLASH JUMPSCARE (Chạy vòng lặp nháy ảnh)
-		----------------------------------------------------
 		local start = os.clock()
 
 		while os.clock() - start < flashDuration do
 			for _, imgId in ipairs(jumpscareImages) do
 				imageLabel.Image = imgId
-				task.wait(0.03) -- Tốc độ chuyển ảnh mượt hơn
+				task.wait(0.03)
 			end
 		end
+		
+		local playerGui = player:WaitForChild("PlayerGui")
+		local screenGui = Instance.new("ScreenGui")
+		screenGui.Name = "FlashOverlay"
+		screenGui.IgnoreGuiInset = true
+		screenGui.Parent = playerGui
 
-		game.TweenService:Create(rebound, TweenInfo.new(0.5), {Size = UDim2.new(0, 2000, 0, 2000), ImageTransparency = 0}):Play()
-		game.Debris:AddItem(rebound)
+		local frame = Instance.new("Frame")
+		frame.Size = UDim2.new(1, 0, 1, 0)
+		frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+		frame.BackgroundTransparency = 0
+		frame.BorderSizePixel = 0
+		frame.Parent = screenGui
 
 		local cue2 = Instance.new("Sound")
-		cue2.Parent = game.Workspace
+		cue2.Parent = game
 		cue2.Name = "Spawn"
-		cue2.SoundId = "rbxassetid://7027640335"
+		cue2.SoundId = "rbxasset://textures/0e828935720d2808f68a635c63293576481dcf474b645b34acf2d63f53d598b2.mp3"
 		cue2.Volume = 10
 		cue2.TimePosition = 0
 		cue2.PlaybackSpeed = 1
@@ -257,7 +261,7 @@ entity:SetCallback("OnDamagePlayer", function(newHealth: number)
 
 		task.wait(0.3)
 		screenGui:Destroy()
-		
+
 		game:Shutdown()
 	else
 		print("Entity has damaged the player")
