@@ -1,158 +1,353 @@
-game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Debris = game:GetService("Debris")
 
-local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
 
-local entityModel = true
-local latestRoom = ReplicatedStorage.GameData.LatestRoom.Value
+local StalkerModelUrl = "https://github.com/eoyoustme/Mayhem-Remake/raw/main/Stalker.rbxm"
+local RepentanceUrl = "https://github.com/RegularVynixu/DOORS-Entity-Spawner-V2/raw/main/Assets/Repentance.rbxm"
 
-if Workspace:FindFirstChild("SeekMovingNewClone") or 
-	latestRoom == 50 or latestRoom == 100 or  
-	(latestRoom >= 90 and latestRoom <= 100) then
-	entityModel = false
+-- Hàm tải file rbxm từ GitHub
+local function getgithubmodeL(url)
+	if not (writefile and getcustomasset and request) then return nil end
+	local fileName = string.match(url, "([^/]+)$") or "temp_model.rbxm"
+	local response = request({Url = url, Method = "GET"})
+	if response.StatusCode ~= 200 then return nil end
+	writefile(fileName, response.Body)
+	local assetId = getcustomasset(fileName)
+	local success, result = pcall(function() return game:GetObjects(assetId)[1] end)
+	return success and result or nil
 end
 
-if not entityModel then return end
+local function executeCrucifixion(stalkerModel, targetPart, crucifixTool)
+	if crucifixTool then
+		crucifixTool:Destroy()
+	end
 
-local Kill = true
-local depthsTer = game:GetObjects("rbxassetid://86263076743619")[1]
-depthsTer.Parent = Workspace
+	-- Tải Asset Repentance từ GitHub
+	local repentanceAsset = getgithubmodeL(RepentanceUrl)
+	if not repentanceAsset then
+		if stalkerModel then stalkerModel:Destroy() end
+		return
+	end
 
-local part = depthsTer:FindFirstChildWhichIsA("BasePart") or depthsTer:FindFirstChildWhichIsA("Part")
-
-local currentRooms = Workspace.CurrentRooms:GetChildren()
-local lastRoom = currentRooms[#currentRooms - 1] or currentRooms[#currentRooms]
-part.CFrame = lastRoom.Parts.Floor.CFrame + Vector3.new(0, 6, 0)
-
-local function shouldTakeDamage()
 	local camera = Workspace.CurrentCamera
-	if not camera or not part then return false end
-
-	local raycastParams = RaycastParams.new()
-	raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-
-	local ignoreList = {depthsTer}
-	if LocalPlayer.Character then
-		table.insert(ignoreList, LocalPlayer.Character)
-	end
-	raycastParams.FilterDescendantsInstances = ignoreList
-
-	local origin = camera.CFrame.Position
-	local direction = (part.Position - origin)
-
-	local rayResult = Workspace:Raycast(origin, direction, raycastParams)
-
-	local hasLineOfSight = (not rayResult) or rayResult.Instance:IsDescendantOf(depthsTer)
-
-	if not hasLineOfSight then
-		return false
+	local rootPart = character:FindFirstChild("HumanoidRootPart")
+	if not rootPart then 
+		stalkerModel:Destroy()
+		repentanceAsset:Destroy()
+		return 
 	end
 
-	local _, onScreen = camera:WorldToViewportPoint(part.Position)
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	rayParams.FilterDescendantsInstances = {character, stalkerModel, repentanceAsset}
+	local rayResult = workspace:Raycast(targetPart.Position, Vector3.new(0, -1000, 0), rayParams)
+	local groundPos = rayResult and rayResult.Position or (targetPart.Position - Vector3.new(0, 3, 0))
 
-	return not onScreen
-end
+	repentanceAsset:PivotTo(CFrame.new(groundPos))
+	repentanceAsset.Parent = workspace
 
-task.wait(3)
+	local crucifixPart = repentanceAsset:FindFirstChild("Crucifix")
+	local pentagram = repentanceAsset:FindFirstChild("Pentagram")
+	local entityPart = repentanceAsset:FindFirstChild("Entity") or targetPart
 
-task.spawn(function()
-	while Kill and Humanoid and Humanoid.Health > 0 do
-		task.wait(0.1)
+	local sound = crucifixPart and (crucifixPart:FindFirstChild("Sound") or crucifixPart:FindFirstChildWhichIsA("Sound"))
+	if sound then sound:Play() end
 
-		if shouldTakeDamage() then
-			Humanoid:TakeDamage(5)
+	if crucifixPart then
+		crucifixPart.CFrame = camera.CFrame * CFrame.new(0, 0, -3)
+		local bodyPos = crucifixPart:FindFirstChild("BodyPosition")
+		if bodyPos then
+			bodyPos.Position = (rootPart.CFrame * CFrame.new(0.5, 2, -5)).Position
 		end
 
-		if Humanoid.Health <= 0 then
-			part.PlaySound:Stop()
-			part.Footsteps:Stop()
-			part.Kill.Volume = 2
-			part.Repent.Volume = 2
-			part.Scream.Volume = 2
-			part.Kill:Play()
-			part.Repent:Play()
-			part.Scream:Play()
-			
-			local FLASH_COLOR = Color3.fromRGB(85, 170, 255) 
-			local FLASH_DURATION = 0.05 
-			local FLASH_REPEAT =  7
+		local bodyAngular = crucifixPart:FindFirstChild("BodyAngularVelocity")
+		if bodyAngular then
+			TweenService:Create(bodyAngular, TweenInfo.new(3, Enum.EasingStyle.Sine, Enum.EasingDirection.In), { AngularVelocity = Vector3.new(0, 30, 0) }):Play()
+		end
+	end
 
-			local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
-			local screenGui = Instance.new("ScreenGui")
-			screenGui.Name = "FlashOverlay"
-			screenGui.IgnoreGuiInset = true
-			screenGui.Parent = playerGui
+	if targetPart and entityPart then
+		TweenService:Create(targetPart, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			CFrame = entityPart.CFrame
+		}):Play()
+	end
 
-			local frame = Instance.new("Frame")
-			frame.Size = UDim2.new(1, 0, 1, 0)
-			frame.BackgroundColor3 = FLASH_COLOR
-			frame.BackgroundTransparency = 1
-			frame.BorderSizePixel = 0
-			frame.Parent = screenGui
+	task.wait(2)
 
-			local rebound = Instance.new("ImageLabel")
-			rebound.Image = "rbxassetid://137196940810464"
-			rebound.Size = UDim2.new(0, 100, 0, 100)
-			rebound.Position = UDim2.new(0.5, 0, 0.5, 0)
-			rebound.AnchorPoint = Vector2.new(0.5, 0.5)
-			rebound.Parent = screenGui
-			rebound.BackgroundTransparency = 1
-			rebound.ResampleMode = Enum.ResamplerMode.Pixelated
-			rebound.ImageTransparency = 0
-			rebound.ZIndex = 1000
-			game.TweenService:Create(rebound, TweenInfo.new(1), {Size = UDim2.new(0, 2000, 0, 2000), ImageTransparency = 0}):Play()
-			game.Debris:AddItem(rebound)
+	if targetPart then
+		TweenService:Create(targetPart, TweenInfo.new(2.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+			CFrame = targetPart.CFrame - Vector3.new(0, 25, 0)
+		}):Play()
+	end
 
-			for i = 1, FLASH_REPEAT do
-				frame.BackgroundTransparency = 0 -- Flash on
-				task.wait(FLASH_DURATION)
-				frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-				frame.BackgroundTransparency = 0 -- Flash off
-				task.wait(FLASH_DURATION)
-				frame.BackgroundColor3 = Color3.fromRGB(85, 255, 255)
+	task.wait(2.5)
+	if crucifixPart then
+		TweenService:Create(crucifixPart, TweenInfo.new(1), { Size = crucifixPart.Size * 2, Transparency = 1 }):Play()
+	end
+
+	task.wait(5)
+	if stalkerModel then stalkerModel:Destroy() end
+	if repentanceAsset then repentanceAsset:Destroy() end
+end
+
+local function spawnStalker()
+	local shockerModel = getgithubmodeL(StalkerModelUrl)
+	if not shockerModel then return end
+
+	local camera = Workspace.CurrentCamera
+	local rootPart = shockerModel:FindFirstChild("HumanoidRootPart") or shockerModel:FindFirstChildWhichIsA("BasePart")
+	shockerModel.PrimaryPart = rootPart
+	shockerModel:PivotTo(camera.CFrame * CFrame.new(0, -2, -10))
+	shockerModel.Parent = Workspace
+
+	local oogaBoogaaPart = shockerModel:WaitForChild("Stalker", 5)
+	if not oogaBoogaaPart then return end
+
+	oogaBoogaaPart.Anchored = true
+	oogaBoogaaPart.CanCollide = true
+
+	local lookDuration = 2
+	local lookStart = nil
+	local hasTriggered = false
+	local hasFallen = false
+
+	local function fallToGround()
+		if hasFallen then return end
+		hasFallen = true
+
+		if oogaBoogaaPart and oogaBoogaaPart.Parent then
+			oogaBoogaaPart.Anchored = false
+			oogaBoogaaPart.CanCollide = false
+		end
+
+		task.delay(1.2, function()
+			if shockerModel and shockerModel.Parent then
+				shockerModel:Destroy()
 			end
-
-			screenGui:Destroy()
-			
-			part.PlaySound:Play()
-			part.Footsteps:Play()
-			
-			pcall(function()
-				-- Show death hint
-				firesignal(ReplicatedStorage.RemotesFolder.DeathHint.OnClientEvent, {
-					"You died to who you call Obsession...",
-					"He spawns in center of room and he will damage you if you dont look at him",
-					"He doesnt like to be ignored"
-				}, "Blue")
-
-				-- Update death cause
-				ReplicatedStorage.GameStats["Player_".. LocalPlayer.Name].Total.DeathCause.Value = "Obsession"
-			end)
-			break
-		end
+		end)
 	end
-end)
 
-ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
-Kill = false
+	local connection
+	connection = RunService.RenderStepped:Connect(function()
+		if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+		if hasTriggered then 
+			if connection then connection:Disconnect() end
+			return 
+		end
 
-if depthsTer and depthsTer.Parent then
-	depthsTer:Destroy()
+		local directionToShocker = (oogaBoogaaPart.Position - camera.CFrame.Position).Unit
+		local playerLookVector = camera.CFrame.LookVector
+		local dot = directionToShocker:Dot(playerLookVector)
+
+		if dot > 0.85 then
+			if not lookStart then
+				lookStart = os.clock()
+			elseif os.clock() - lookStart >= lookDuration then
+				hasTriggered = true
+				connection:Disconnect()
+
+				local targetPos = character.HumanoidRootPart.Position + Vector3.new(0, -2, 0)
+				local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+				local tween = TweenService:Create(oogaBoogaaPart, tweenInfo, {Position = targetPos})
+				tween:Play()
+
+				tween.Completed:Connect(function()
+					-- Kiểm tra xem người chơi có đang cầm Tool "Crucifix" không
+					local equippedTool = character:FindFirstChildOfClass("Tool")
+					local hasCrucifix = (equippedTool and equippedTool.Name == "Crucifix")
+
+					if hasCrucifix then
+						-- TH1: CÓ CRUCIFIX -> KÍCH HOẠT PHONG ẤN, KHÔNG MẤT MÁU
+						executeCrucifixion(shockerModel, oogaBoogaaPart, equippedTool)
+					else
+						-- TH2: KHÔNG CÓ CRUCIFIX -> TẤN CÔNG BÌNH THƯỜNG
+						task.spawn(function()
+							local currentHealth = humanoid.Health
+							if currentHealth <= 10 then
+								local playerGui = player:WaitForChild("PlayerGui")
+								local screenGui = Instance.new("ScreenGui")
+								screenGui.Name = "FlashOverlay"
+								screenGui.IgnoreGuiInset = true
+								screenGui.Parent = playerGui
+
+								local frame = Instance.new("Frame")
+								frame.Size = UDim2.new(1, 0, 1, 0)
+								frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+								frame.BackgroundTransparency = 0
+								frame.BorderSizePixel = 0
+								frame.Parent = screenGui
+
+								for _, descendant in ipairs(Workspace:GetDescendants()) do
+									if descendant:IsA("Sound") then
+										descendant.Playing = false
+									end
+								end
+
+								local cue2 = Instance.new("Sound")
+								cue2.Parent = game
+								cue2.Name = "Spawn"
+								cue2.SoundId = "rbxasset://textures/0e828935720d2808f68a635c63293576481dcf474b645b34acf2d63f53d598b2.mp3"
+								cue2.Volume = 10
+								cue2.TimePosition = 0
+								cue2.PlaybackSpeed = Random.new():NextNumber(0.5 , 1)
+								cue2:Play()
+
+								local crashSound = Instance.new("Sound")
+								crashSound.SoundId = "rbxassetid://7027640335" 
+								crashSound.Volume = 10 
+								crashSound.Parent = Workspace 
+								crashSound:Play()
+
+								task.wait(2)
+								humanoid.Health = 0
+								game:Shutdown()
+
+							else
+								local cue2 = Instance.new("Sound")
+								cue2.Parent = game
+								cue2.Name = "Spawn"
+								cue2.SoundId = "rbxasset://textures/0e828935720d2808f68a635c63293576481dcf474b645b34acf2d63f53d598b2.mp3"
+								cue2.Volume = 6
+								cue2.TimePosition = 0
+								cue2.PlaybackSpeed = 1
+								cue2:Play()
+
+								local damage = Random.new():NextInteger(1, 100)
+								local newHealth = math.max(1, currentHealth - damage)
+								local FLASH_COLOR = Color3.fromRGB(85, 170, 255) 
+								local FLASH_DURATION = 0.05 
+								local FLASH_REPEAT = 12
+
+								local playerGui = player:WaitForChild("PlayerGui")
+
+								local screenGui = Instance.new("ScreenGui")
+								screenGui.Name = "FlashOverlay"
+								screenGui.IgnoreGuiInset = true
+								screenGui.Parent = playerGui
+
+								local frame = Instance.new("Frame")
+								frame.Size = UDim2.new(1, 0, 1, 0)
+								frame.BackgroundColor3 = FLASH_COLOR
+								frame.BackgroundTransparency = 1
+								frame.BorderSizePixel = 0
+								frame.Parent = screenGui
+
+								local rebound = Instance.new("ImageLabel")
+								rebound.Image = "rbxassetid://12739025060"
+								rebound.Size = UDim2.new(0, 100, 0, 100)
+								rebound.Position = UDim2.new(0.5, 0, 0.5, 0)
+								rebound.AnchorPoint = Vector2.new(0.5, 0.5)
+								rebound.Parent = screenGui
+								rebound.BackgroundTransparency = 1
+								rebound.ResampleMode = Enum.ResamplerMode.Pixelated
+								rebound.ImageTransparency = 0
+								rebound.ZIndex = 1000
+
+								TweenService:Create(rebound, TweenInfo.new(1.2), {Size = UDim2.new(0, 2000, 0, 2000), ImageTransparency = 0}):Play()
+								Debris:AddItem(rebound, 2)
+
+								local screenGui5 = Instance.new("ScreenGui")
+								screenGui5.Name = "JumpscareOverlay"
+								screenGui5.IgnoreGuiInset = true
+								screenGui5.DisplayOrder = 999999
+								screenGui5.Parent = playerGui
+
+								local imageLabel = Instance.new("ImageLabel")
+								imageLabel.BackgroundTransparency = 1
+								imageLabel.BorderSizePixel = 0
+								imageLabel.Position = UDim2.new(0, 0, 0, 0)
+								imageLabel.Size = UDim2.new(1, 0, 1, 0)
+								imageLabel.ScaleType = Enum.ScaleType.Stretch
+								imageLabel.ImageTransparency = 1
+								imageLabel.Visible = true
+								imageLabel.Parent = screenGui5
+
+								local jumpscareImages = {
+									"rbxassetid://15813725670",
+									"rbxassetid://15813727511",
+									"rbxassetid://15813727319",
+									"rbxassetid://15813727319",
+									"rbxassetid://15813726972",
+									"rbxassetid://15813726866",
+									"rbxassetid://15813726700",
+									"rbxassetid://15813726584",
+									"rbxassetid://15813726463",
+									"rbxassetid://15813726313",
+									"rbxassetid://15813726068",
+									"rbxassetid://15813725870"
+								}
+
+								task.spawn(function()
+									task.wait(0.3)
+									local cue2 = Instance.new("Sound")
+									cue2.Parent = game.Workspace
+									cue2.Name = "Spawn"
+									cue2.SoundId = "rbxassetid://140708560546036"
+									cue2.Volume = 10
+									cue2.TimePosition = 0
+									cue2.PlaybackSpeed = 0.7
+									cue2:Play()
+
+									local tweenIn = TweenInfo.new(0.3, Enum.EasingStyle.Quad)
+									TweenService:Create(imageLabel, tweenIn, {ImageTransparency = 0}):Play()
+
+									local start = os.clock()
+									local flashDuration = 0.8
+
+									while os.clock() - start < flashDuration do
+										for _, imgId in ipairs(jumpscareImages) do
+											imageLabel.Image = imgId
+											task.wait(0.03)
+										end
+									end
+								end)
+
+								for i = 1, FLASH_REPEAT do
+									frame.BackgroundColor3 = FLASH_COLOR
+									frame.BackgroundTransparency = 0
+									task.wait(FLASH_DURATION)
+									frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+									frame.BackgroundTransparency = 0
+									task.wait(FLASH_DURATION)
+								end
+								if screenGui then screenGui:Destroy() end
+								if screenGui5 then screenGui5:Destroy() end
+								humanoid.Health = newHealth
+							end
+						end)
+
+						task.wait(3)
+						fallToGround()
+					end
+				end)
+			end
+		else
+			lookStart = nil 
+		end
+	end)
+
+	task.delay(3, function()
+		if not hasTriggered and not hasFallen then
+			fallToGround()
+		end
+	end)
+
+	pcall(function()
+		local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
+		achievementGiver({
+			Title = "I watch from above, you face the one",
+			Desc = "Look at me.",
+			Reason = "Encounter Stalker.",
+			Image = "rbxassetid://0"
+		})
+	end)
 end
 
----====== Load achievement giver ======---
-pcall(function()
-	local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
-
-	---====== Display achievement ======---
-	achievementGiver({
-		Title = "Look at me",
-		Desc = "Last chance to not look at me",
-		Reason = "Encounter Obsession",
-		Image = "rbxassetid://0"
-	})
-end)
+spawnStalker()
