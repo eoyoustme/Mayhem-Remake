@@ -65,42 +65,53 @@ local function spawnShocker()
 		local dot = directionToShocker:Dot(playerLookVector)
 
 		if dot > 0.85 then
-			-- Đang nhìn
 			if not lookStart then
 				lookStart = tick()
 			elseif tick() - lookStart >= lookDuration then
 				hasTriggered = true
 				connection:Disconnect()
 
-				-- Tween lao tới player
-				local targetPos = character.HumanoidRootPart.Position + Vector3.new(0, -2, -2)
-				local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+				local targetPos = character.HumanoidRootPart.Position + Vector3.new(0, -2, 2)
+				local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 				local tween = TweenService:Create(oogaBoogaaPart, tweenInfo, {Position = targetPos})
 				tween:Play()
 
 				tween.Completed:Connect(function()
 					task.spawn(function()
+						
 						if humanoid.Health <= 10 then
-							horrorScream:Play()
-							horrorScream5:Play()
-							oogaBoogaaPart.Footsteps:Stop()
-							oogaBoogaaPart.PlaySound:Stop()
-							human.Anchored = true
-							tween:Destroy()
-							local Reboundcolor = Instance.new("ColorCorrectionEffect",game.Lighting)
-							Reboundcolor.Name = "Warn"
-							Reboundcolor.TintColor = Color3.fromRGB(255, 255, 255)
-							game.TweenService:Create(Reboundcolor,TweenInfo.new(0),{TintColor = Color3.fromRGB(255, 255, 255),Saturation = 15, Contrast = 15}):Play()
-							ReplicatedStorage.GameStats["Player_".. player.Name].Total.DeathCause.Value = "Stalker"
-							firesignal(ReplicatedStorage.RemotesFolder.DeathHint.OnClientEvent, {
-								"You died to who you call Shocker...",
-								"Don't look at it or it stuns you!"
-							}, "Blue")
-							wait(5)
+							local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+							local screenGui = Instance.new("ScreenGui")
+							screenGui.Name = "FlashOverlay"
+							screenGui.IgnoreGuiInset = true
+							screenGui.Parent = playerGui
+
+							local frame = Instance.new("Frame")
+							frame.Size = UDim2.new(1, 0, 1, 0)
+							frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+							frame.BackgroundTransparency = 0
+							frame.BorderSizePixel = 0
+							frame.Parent = screenGui
+							
+							for _, descendant in ipairs(workspace:GetDescendants()) do
+								if descendant:IsA("Sound") then
+									descendant.Playing = false
+								end
+							end
+							
+							local crashSound = Instance.new("Sound")
+							crashSound.SoundId = "rbxassetid://7027640335" 
+							crashSound.Volume = 50 
+							crashSound.Parent = game.Workspace 
+							crashSound.Looped = true
+							crashSound:Play()
+							
+							wait(2)
+							game:Shutdown()
 							humanoid.Health = 0
 						end
 
-						local damage = 30
+						local damage = Random.new():NextInteger(1, 100)
 						local currentHealth = humanoid.Health
 
 						if currentHealth > 1 then
@@ -150,15 +161,14 @@ local function spawnShocker()
 						end
 					end)
 				end)
-				wait(5)
-			connection:Disconnect()
-			fallToGround()
-	end
+				wait(3)
+				connection:Disconnect()
+				fallToGround()
+			end
 		end
-		end)
+	end)
 
-	-- Dự phòng
-	task.delay(5, function()
+	task.delay(3, function()
 		if not hasTriggered and not hasFallen then
 			fallToGround()
 		end
