@@ -1,0 +1,285 @@
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local to = nil
+local Kill = nil
+local dcto = false
+local cue25 = nil
+local camShakeInstance = nil
+local canAttack = true
+
+local CameraShaker = require(ReplicatedStorage:WaitForChild("CameraShaker"))
+
+---====== Load spawner ======---
+
+local Spawner = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/DOORS-Entity-Spawner-V2/main/init.luau"))()
+
+---====== Create entity ======---
+
+local entity = Spawner:Create({
+	Entity = {
+		Name = "Deer God",
+		Asset = "rbxassetid://103599825077911",
+		HeightOffset = 0
+	},
+	Lights = {
+		Flicker = {
+			Enabled = true,
+			Duration = 100
+		},
+		Shatter = true,
+		Repair = false
+	},
+	Earthquake = {
+		Enabled = false
+	},
+	CameraShake = {
+		Enabled = true,
+		Range = 100,
+		Values = {1.5, 20, 0.1, 1} -- Magnitude, Roughness, FadeIn, FadeOut
+	},
+	Movement = {
+		Speed = 23,
+		Delay = 0,
+		Reversed = false
+	},
+	Rebounding = {
+		Enabled = false,
+		Type = "Ambush", -- "Blitz"
+		Min = 1,
+		Max = 1,
+		Delay = 2
+	},
+	Damage = {
+		Enabled = true,
+		IgnoreHiding = true,
+		Range = 400,
+		Amount = 0.0001
+	},
+	Crucifixion = {
+		Enabled = true,
+		Range = 40,
+		Resist = false,
+		Break = true
+	},
+	Death = {
+		Type = "Guiding", -- "Curious"
+		Hints = {"Death", "Hints", "Go", "Here"},
+		Cause = "Deer God"
+	}
+})
+
+
+dcto = true
+task.spawn(function()
+	local camera = Workspace.CurrentCamera
+	local player = Players.LocalPlayer
+
+	while dcto == true do
+		task.wait(1) 
+
+		if canAttack then
+			local model = Workspace:FindFirstChild("Deer God")
+			if model and model.Parent then
+				-- Lấy Part chính của Model
+				local part = model:FindFirstChild("Deer God") or model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+
+				if part then
+					local _, onScreen = camera:WorldToViewportPoint(part.Position)
+
+					if onScreen then
+						local camPos = camera.CFrame.Position
+						local direction = part.Position - camPos
+
+						local rayParams = RaycastParams.new()
+						rayParams.FilterType = Enum.RaycastFilterType.Exclude
+						rayParams.FilterDescendantsInstances = {player.Character, model} 
+						rayParams.IgnoreWater = true
+
+						local hitResult = Workspace:Raycast(camPos, direction, rayParams)
+
+						if not hitResult then
+							local char = player.Character
+							local hum = char and char:FindFirstChildOfClass("Humanoid")
+							if hum and hum.Health > 0 then
+								hum:TakeDamage(10)
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end)
+
+---====== CALLBACKS ======---
+
+entity:SetCallback("OnSpawned", function()
+	print("Entity has spawned")
+
+	cue25 = Instance.new("Sound")
+	cue25.Parent = Workspace
+	cue25.Name = "Spawn"
+	cue25.SoundId = "rbxassetid://82890415629830"
+	cue25.Volume = 5
+	cue25.PlaybackSpeed = 0.2
+	cue25.Looped = true
+	cue25:Play()
+
+	local _CurrentCamera = Workspace.CurrentCamera
+	camShakeInstance = CameraShaker.new(Enum.RenderPriority.Camera.Value, function(p143)
+		_CurrentCamera.CFrame = _CurrentCamera.CFrame * p143
+	end)
+	camShakeInstance:Start()
+	camShakeInstance:ShakeSustain(CameraShaker.Presets.Earthquake)
+end)
+
+entity:SetCallback("OnStartMoving", function()
+	print("Entity has started moving")
+
+	Kill = task.spawn(function()
+		while task.wait(0.1) do
+			local model = Workspace:FindFirstChild("Deer God")
+			if model then
+				local part = model:FindFirstChild("Deer God") or model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+
+				local rushNew = model:FindFirstChild("RushNew")
+				if rushNew and rushNew:IsA("BasePart") then
+					rushNew.CanCollide = false
+				end
+
+				local player = Players.LocalPlayer
+				local char = player.Character
+				local hum = char and char:FindFirstChildOfClass("Humanoid")
+				local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+				if part and hum and hrp and hum.Health > 0 then
+					if (hrp.Position - part.Position).Magnitude <= 9 then
+						hum.Health = 0
+					end
+				end
+			end
+		end
+	end)
+end)
+
+entity:SetCallback("OnEnterRoom", function(room: Model, firstTime: boolean)
+	if firstTime == true then
+		print("Entity has entered room: ".. room.Name.. " for the first time")
+	else
+		print("Entity has entered room: ".. room.Name.. " again")
+	end
+end)
+
+entity:SetCallback("OnLookAt", function(lineOfSight: boolean)
+	if lineOfSight == true then
+		print("Player is looking at entity")
+	else
+		print("Player view is obstructed by something")
+	end
+end)
+
+entity:SetCallback("OnRebounding", function(startOfRebound: boolean)
+	if startOfRebound == true then
+		print("Entity has started rebounding")
+	else
+		print("Entity has finished rebounding")
+	end
+end)
+
+entity:SetCallback("OnDespawning", function()
+	print("Entity is despawning")
+	local cue2 = Instance.new("Sound")
+	cue2.Parent = game.Workspace
+	cue2.Name = "Spawn"
+	cue2.SoundId = "rbxassetid://635822826"
+	cue2.Volume = 99999
+	cue2.PlaybackSpeed = 0.6
+	cue2:Play()
+	
+	local cue255 = Instance.new("Sound")
+	cue255.Parent = game.Workspace
+	cue255.Name = "Spawn"
+	cue255.SoundId = "rbxassetid://9043357758"
+	cue255.Volume = 99999
+	cue255.PlaybackSpeed = 1
+	cue255:Play()
+	
+	canAttack = false
+	dcto = false
+
+	if cue25 then
+		cue25:Destroy()
+		cue25 = nil
+	end
+
+	if camShakeInstance then
+		camShakeInstance:StopSustained(0.5)
+		camShakeInstance:Stop()
+		camShakeInstance = nil
+	end
+
+	local model = Workspace:FindFirstChild("Deer God")
+	if model then
+		model:Destroy()
+	end
+
+	if to then
+		task.cancel(to)
+		to = nil
+	end
+
+	if Kill then
+		task.cancel(Kill)
+		Kill = nil
+	end
+end)
+
+entity:SetCallback("OnDespawned", function()
+	print("Entity has despawned")
+end)
+
+entity:SetCallback("OnDamagePlayer", function(newHealth: number)
+	if newHealth <= 0 then
+		print("Entity has killed the player")
+	else
+		print("Entity has damaged the player")
+
+		if not to then
+			to = task.spawn(function()
+				local player = Players.LocalPlayer
+
+				while task.wait(0.05) do
+					local model = Workspace:FindFirstChild("Deer God")
+					if not model then break end
+
+					local part = model:FindFirstChild("Deer God") or model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+					local char = player.Character
+					local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+					if part and hrp then
+						part.Anchored = true
+						local targetCFrame = hrp.CFrame
+						local distance = (targetCFrame.Position - part.Position).Magnitude
+						local duration = math.max(0.05, distance / 23)
+
+						local tween = TweenService:Create(
+							part,
+							TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut),
+							{CFrame = targetCFrame}
+						)
+
+						tween:Play()
+						tween.Completed:Wait()
+					end
+				end
+			end)
+		end	
+	end
+end)
+
+---====== Run entity ======---
+
+entity:Run(true)
