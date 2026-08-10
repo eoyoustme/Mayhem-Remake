@@ -171,18 +171,18 @@ end)
 entity:SetCallback("OnDespawning", function()
 	print("Entity is despawning")
 
-local success, achievementGiver = pcall(function()
-                    return loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
-                end)
+	local success, achievementGiver = pcall(function()
+		return loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
+	end)
 
-                if success and achievementGiver then
-                    achievementGiver({
-                        Title = "Negative",
-                        Desc = "Is have SO Much Fun..kiddo..",
-                        Reason = "Encounter and survive Threat..",
-                        Image = "rbxassetid://71770268682304"
-                    })
-                end
+	if success and achievementGiver then
+		achievementGiver({
+			Title = "Negative",
+			Desc = "Is have SO Much Fun..kiddo..",
+			Reason = "Encounter and survive Threat..",
+			Image = "rbxassetid://71770268682304"
+		})
+	end
 
 	local colorCorrection = game.Lighting:FindFirstChild("MainColorCorrection")
 	if colorCorrection then
@@ -233,25 +233,15 @@ entity:SetCallback("OnDamagePlayer", function(newHealth)
 			controlsModule:Disable()
 
 			local to5 = true
-			task.spawn(function()
-				while to5 and primaryPart.Parent and humanoidRootPart.Parent do
 					local targetCFrame = humanoidRootPart.CFrame
 					local tween = TweenService:Create(primaryPart, TweenInfo.new(1, Enum.EasingStyle.Quad), {CFrame = targetCFrame})
 					tween:Play()
-					tween.Completed:Wait()
-				end
-			end)
 			task.wait(0.5)
+			tween:Destroy()
 
-			local t5 = true
-			task.spawn(function()
-				while t5 and primaryPart.Parent and humanoidRootPart.Parent do
 					local targetCFrame = humanoidRootPart.CFrame
-					local tween = TweenService:Create(primaryPart, TweenInfo.new(100000000000000000000000000, Enum.EasingStyle.Quad), {CFrame = targetCFrame})
+					local tween = TweenService:Create(primaryPart, TweenInfo.new(10000000000000000, Enum.EasingStyle.Quad), {CFrame = targetCFrame})
 					tween:Play()
-					tween.Completed:Wait()
-				end
-			end)
 
 			entity:Pause()
 
@@ -305,7 +295,7 @@ entity:SetCallback("OnDamagePlayer", function(newHealth)
 			task.wait(2.8)
 			firesignal(game.ReplicatedStorage.RemotesFolder.DeathHint.OnClientEvent, {"You died to who you call Threat","he will get faster every he fisnhed a rebound","Hide in a closet if he spawn."},"Blue")
 
-			to5 = false -- 🟢 Đã sửa lỗi biến to5 để tắt vòng lặp di chuyển
+			to5 = false
 
 			if humanoid then humanoid.Health = 0 end
 
