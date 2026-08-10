@@ -108,6 +108,15 @@ local function spawnStalker()
 								end
 							end
 
+local cue2 = Instance.new("Sound")
+		cue2.Parent = game
+		cue2.Name = "Spawn"
+		cue2.SoundId = "rbxasset://textures/0e828935720d2808f68a635c63293576481dcf474b645b34acf2d63f53d598b2.mp3"
+		cue2.Volume = 10
+		cue2.TimePosition = 0
+		cue2.PlaybackSpeed = 1
+		cue2:Play()
+
 							local crashSound = Instance.new("Sound")
 							crashSound.SoundId = "rbxassetid://7027640335" 
 							crashSound.Volume = 10 
