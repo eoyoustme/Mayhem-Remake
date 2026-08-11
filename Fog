@@ -379,7 +379,7 @@ latestRoom.Changed:Connect(function(roomValue)
 		end
 
 		initEntity()
-		latestRoom.Changed:Connect(function()
+		latestRoom.Changed:Wait()
 			resetLightingSmoothly()
 			entityModel:Destroy()
 			---====== Load achievement giver ======---
@@ -392,6 +392,5 @@ latestRoom.Changed:Connect(function(roomValue)
 				Reason = "Survive Fog",
 				Image = "rbxassetid://"
 			})
-		end)
 	end
 end)
