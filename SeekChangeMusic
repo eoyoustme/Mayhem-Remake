@@ -1,0 +1,28 @@
+local Workspace = game:GetService("Workspace")
+
+local function GetGitSound(GithubSnd, SoundName)
+    local fileName = SoundName .. ".mp3"
+    
+    if not isfile(fileName) then
+        writefile(fileName, game:HttpGet(GithubSnd))
+    end
+    
+    local sound = Instance.new("Sound")
+    sound.SoundId = (getcustomasset or getsynasset)(fileName)
+    return sound
+end
+
+local soundUrl = "https://github.com/eoyoustme/Mayhem-Remake/blob/main/SeekMusicMayhemRemake.mp3?raw=true"
+local gitSoundTemp = GetGitSound(soundUrl, "SeekMusicMayhemRemake")
+local customSoundId = gitSoundTemp.SoundId
+gitSoundTemp:Destroy()
+
+Workspace.ChildAdded:Connect(function(child)
+    if string.lower(child.Name) == "seekmovingnewclone" then
+        local seekMusic = child:WaitForChild("SeekMusic", 5) or child:FindFirstChild("SeekMusic", true)
+        
+        if seekMusic and seekMusic:IsA("Sound") then
+            seekMusic.SoundId = customSoundId
+        end
+    end
+end)
