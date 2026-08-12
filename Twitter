@@ -17,6 +17,24 @@ end
 
 local RepentanceUrl = "https://github.com/RegularVynixu/DOORS-Entity-Spawner-V2/raw/main/Assets/Repentance.rbxm"
 
+-- ========================================================
+-- HÀM LẤY GAMESEED ĐỒNG BỘ MULTIPLAYER
+-- ========================================================
+local function getGameSeed()
+	if gameData then
+		local seedVal = gameData:FindFirstChild("GameSeed")
+		if seedVal and seedVal:IsA("ValueBase") and tonumber(seedVal.Value) then
+			return tonumber(seedVal.Value)
+		end
+
+		local attrSeed = gameData:GetAttribute("GameSeed")
+		if attrSeed and tonumber(attrSeed) then
+			return tonumber(attrSeed)
+		end
+	end
+	return 12345
+end
+
 -- Hàm lấy file từ GitHub (cho Asset/Sound/PNG)
 local function getgithubmodeL(url)
 	if not (writefile and getcustomasset and request) then return nil end
@@ -152,16 +170,6 @@ local function executeCrucifixion(entityModel, targetPart, crucifixTool)
 	if repentanceAsset then repentanceAsset:Destroy() end
 end
 
-local seed = 12345
-if gameData then
-	local seedVal = gameData:FindFirstChild("GameSeed")
-	if seedVal and seedVal:IsA("ValueBase") then
-		seed = seedVal.Value
-	elseif gameData:GetAttribute("GameSeed") then
-		seed = gameData:GetAttribute("GameSeed")
-	end
-end
-
 local startRoomNum = lastroom.Value
 
 local oldmodel = workspace:FindFirstChild("Twiter")
@@ -191,10 +199,16 @@ warningSound5.Volume = 2
 warningSound5.PlaybackSpeed = 1
 warningSound5:Play()
 
-local syncRNG_Initial = Random.new(seed + (startRoomNum * 777) + 11)
+-- ========================================================
+-- CHIẾN THUẬT TÍNH PHÒNG XUẤT HIỆN TUYỆT ĐỐI (GAMESEED FIXED)
+-- ========================================================
+local currentSeed = getGameSeed()
+local syncRNG_Initial = Random.new(currentSeed + (startRoomNum * 777) + 11)
 local initialRoomWait = syncRNG_Initial:NextInteger(1, 5)
+local targetSpawnRoom = startRoomNum + initialRoomWait
 
-for i = 1, initialRoomWait do
+-- Chờ tới đúng phòng mục tiêu tuyệt đối trên toàn server
+while lastroom.Value < targetSpawnRoom do
 	lastroom.Changed:Wait()
 end
 
@@ -344,11 +358,16 @@ task.spawn(function()
 	if depthsTer then depthsTer:Destroy() end
 end) 
 
+-- ========================================================
+-- CHIẾN THUẬT TWITER MOVE TUYỆT ĐỐI (GAMESEED FIXED)
+-- ========================================================
 task.spawn(function()
-	local syncRNG_Move1 = Random.new(seed + (startRoomNum * 1337) + 99)
+	local syncRNG_Move1 = Random.new(currentSeed + (startRoomNum * 1337) + 99)
 	local waitRooms = syncRNG_Move1:NextInteger(1, 15)
+	local targetMoveRoom1 = targetSpawnRoom + waitRooms
 
-	for i = 1, waitRooms do
+	-- Chờ cho tới phòng di chuyển 1
+	while lastroom.Value < targetMoveRoom1 do
 		lastroom.Changed:Wait()
 	end
 
@@ -358,10 +377,12 @@ task.spawn(function()
 		warningSound55:Play()
 	end
 
-	local syncRNG_Move2 = Random.new(seed + (startRoomNum * 333) + 44)
+	local syncRNG_Move2 = Random.new(currentSeed + (startRoomNum * 333) + 44)
 	local waitRooms2 = syncRNG_Move2:NextInteger(1, 1)
+	local targetMoveRoom2 = targetMoveRoom1 + waitRooms2
 
-	for i = 1, waitRooms2 do
+	-- Chờ cho tới phòng di chuyển 2
+	while lastroom.Value < targetMoveRoom2 do
 		lastroom.Changed:Wait()
 	end
 
