@@ -655,7 +655,7 @@ end)
 
 task.spawn(function()
 	local syncRNG_Move1 = Random.new(currentSeed + (startRoomNum * 1337) + 99)
-	local waitRooms = syncRNG_Move1:NextInteger(1, 15)
+	local waitRooms = syncRNG_Move1:NextInteger(1, 1)
 	local targetMoveRoom1 = targetSpawnRoom + waitRooms
 
 	-- Chờ cho tới phòng di chuyển 1
