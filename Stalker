@@ -120,7 +120,6 @@ local function executeCrucifixion(stalkerModel, targetPart, crucifixTool)
 end
 
 local function SpecialCrucifixion(entityModel, targetPart, crucifixTool)
-	if crucifixTool then crucifixTool:Destroy() end
 	local repentanceAsset = getgithubmodeL(SpecialUrl)
 	if not repentanceAsset then
 		if entityModel then entityModel:Destroy() end
