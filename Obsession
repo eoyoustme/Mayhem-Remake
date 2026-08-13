@@ -245,9 +245,9 @@ local function SpecialCrucifixion(entityModel, targetPart, crucifixTool)
 				mergeSound:Play()
 				local revers = Instance.new("ReverbSoundEffect")
 				revers.Parent = mergeSound
-				
+
 				wait(0.3)
-				
+
 				local mergeSound = Instance.new("Sound")
 				mergeSound.Parent = workspace
 				mergeSound.SoundId = "rbxassetid://5835557537"
@@ -272,7 +272,7 @@ local function SpecialCrucifixion(entityModel, targetPart, crucifixTool)
 				mergeSound.Volume = 3
 				mergeSound.PlaybackSpeed = 0.9
 				mergeSound:Play()
-			
+
 
 				-- 1. XÓA ENTITY MODEL
 				if entityModel then entityModel:Destroy() end
@@ -285,7 +285,7 @@ local function SpecialCrucifixion(entityModel, targetPart, crucifixTool)
 					if b and b:IsA("Beam") and origP then
 						local co = game:GetObjects("rbxassetid://9118302120")[1]
 						co.Parent = workspace
-						co.CFrame = targetPart.CFrame
+						co.CFrame = targetPart.CFrame * CFrame.new(0, -1, 0)
 						co.Anchored = true
 						local att = co.Attachment.Blood
 						att.Size = NumberSequence.new(8)
@@ -296,9 +296,9 @@ local function SpecialCrucifixion(entityModel, targetPart, crucifixTool)
 						cPart.Transparency = 1
 						cPart.CanCollide = false
 						cPart.Anchored = true
-						cPart.CFrame = targetPart.CFrame -- Xuất phát từ vị trí Entity
+						cPart.CFrame = targetPart.CFrame * CFrame.new(0, -1, 0) -- Xuất phát từ vị trí Entity
 						cPart.Parent = workspace
-						
+
 						local Reboundcolor = Instance.new("ColorCorrectionEffect",game.Lighting) game.Debris:AddItem(Reboundcolor,24)
 						Reboundcolor.Name = "Warn"
 						Reboundcolor.TintColor = Color3.fromRGB(74, 0, 0) Reboundcolor.Saturation = 0 Reboundcolor.Contrast = 0.2
@@ -306,7 +306,7 @@ local function SpecialCrucifixion(entityModel, targetPart, crucifixTool)
 						local TweenService = game:GetService("TweenService")
 						local TW = TweenService:Create(game.Lighting.MainColorCorrection, TweenInfo.new(1.6),{TintColor = Color3.fromRGB(255, 255, 255)})
 						TW:Play()
-						
+
 						task.spawn(function()
 							wait(0.6)
 							att.Enabled = false
@@ -317,7 +317,7 @@ local function SpecialCrucifixion(entityModel, targetPart, crucifixTool)
 						local cAtt = Instance.new("Attachment")
 						cAtt.Name = "CenterBeamAttachment"
 						cAtt.Parent = cPart
-						
+
 
 						b.Attachment1 = cAtt
 
@@ -432,7 +432,20 @@ local function shouldTakeDamage()
 end
 
 task.wait(3)
-
+function GitPNG(GithubImg, ImageName)
+	local url = GithubImg
+	if not isfile(ImageName .. ".png") then
+		local success, response = pcall(function()
+			return game:HttpGet(url)
+		end)
+		if success then
+			writefile(ImageName .. ".png", response)
+		else
+			error(": " .. response)
+		end
+	end
+	return (getcustomasset or getsynasset)(ImageName .. ".png")
+end
 task.spawn(function()
 	while Kill and Humanoid and Humanoid.Health > 0 do
 		task.wait(0.1)
@@ -444,12 +457,32 @@ task.spawn(function()
 				if part:FindFirstChild("PlaySound") then part.PlaySound:Stop() end
 				if part:FindFirstChild("Footsteps") then part.Footsteps:Stop() end
 				executeCrucifixion(depthsTer, part, equippedTool)
+				pcall(function()
+					local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
+
+					achievementGiver({
+						Title = "Restraining Order",
+						Desc = "Look who's trapped now.",
+						Reason = "Crucifix Obsession",
+						Image = GitPNG("https://github.com/eoyoustme/Mayhem-Remake/blob/main/Obsessioncrucifix.png?raw=true", "Sayhex")
+					})
+				end)
 				break
 			elseif equippedTool and equippedTool.Name == "CrucifixSpecial" then
 				Kill = false 
 				if part:FindFirstChild("PlaySound") then part.PlaySound:Stop() end
 				if part:FindFirstChild("Footsteps") then part.Footsteps:Stop() end
 				SpecialCrucifixion(depthsTer, part, equippedTool)
+				pcall(function()
+					local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
+
+					achievementGiver({
+						Title = "Restraining Order",
+						Desc = "Look who's trapped now.",
+						Reason = "Crucifix Obsession",
+						Image = GitPNG("https://github.com/eoyoustme/Mayhem-Remake/blob/main/Obsessioncrucifix.png?raw=true", "Sayhex")
+					})
+				end)
 				break
 			else
 				Humanoid:TakeDamage(5)
