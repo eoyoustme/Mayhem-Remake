@@ -108,7 +108,6 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
 local function SpecialCrucifixion(entityModel, targetPart, crucifixTool)
-	if crucifixTool then crucifixTool:Destroy() end
 	local repentanceAsset = getgithubmodeL(SpecialUrl)
 	if not repentanceAsset then
 		if entityModel then entityModel:Destroy() end
