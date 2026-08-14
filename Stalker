@@ -215,7 +215,7 @@ local function SpecialCrucifixion(entityModel, targetPart, crucifixTool)
 	end
 	local bodyAngular = crucifixPart and crucifixPart:FindFirstChild("BodyAngularVelocity")
 	if crucifixPart then
-		crucifixPart.CFrame = camera.CFrame * CFrame.new(0, 0, -3)
+		crucifixPart.CFrame = camera.CFrame * CFrame.new(0, 0, -7)
 		local bodyPos = crucifixPart:FindFirstChild("BodyPosition")
 		if bodyPos then bodyPos.Position = (rootPart.CFrame * CFrame.new(0.5, 2, -5)).Position end
 
@@ -251,6 +251,209 @@ local function SpecialCrucifixion(entityModel, targetPart, crucifixTool)
 			targetPart.Kill:Play()
 			targetPart.Kill.Volume = 7
 			targetPart.Kill.PlaybackSpeed = 0.2
+			
+			task.spawn(function()
+				local Players = game:GetService("Players")
+				local RunService = game:GetService("RunService")
+				local localPlayer = Players.LocalPlayer
+
+				if not localPlayer then return end
+
+				local random = math.random
+				local vector3New = Vector3.new
+
+				local MAX_DISTANCE = 150        
+				local GLITCH_INTENSITY = 1.5    
+				local GLITCH_DURATION = 2.5      
+
+				local startTime = os.clock()
+
+				local visualClones = {}         
+				local targetParts = {}
+				setmetatable(visualClones, {__mode = "k"}) 
+
+				-- [TỰ ĐỘNG TẠO UI FRAME NHẤP NHÁY]
+				local playerGui = localPlayer:WaitForChild("PlayerGui")
+				local screenGui = playerGui:FindFirstChild("GlitchGui") or Instance.new("ScreenGui")
+				screenGui.Name = "GlitchGui"
+				screenGui.ResetOnSpawn = false
+				screenGui.Parent = playerGui
+				screenGui.IgnoreGuiInset = true
+
+				local Frame = screenGui:FindFirstChild("ShaderFrame") or Instance.new("Frame")
+				Frame.Name = "ShaderFrame"
+				Frame.Size = UDim2.new(1, 0, 1, 0)
+				Frame.Position = UDim2.new(0, 10, 0, 10)
+				Frame.BorderSizePixel = 0
+				Frame.Visible = true
+				Frame.Parent = screenGui
+				Frame.BackgroundTransparency = 0.7
+
+				task.spawn(function()
+					while Frame and Frame.Parent do
+						Frame.BackgroundColor3 = Color3.fromRGB(math.random(0, 255), math.random(0, 255), math.random(0, 255))
+						task.wait(0.05)
+					end
+				end)
+
+				local sound = Instance.new("Sound", workspace)
+				sound.SoundId = "rbxassetid://140558918020400"
+				sound.Volume = 10
+				sound.PlaybackSpeed = 1
+				sound:Play()
+
+				local function isExcluded(part)
+					if not part:IsA("BasePart") or part:IsA("Terrain") or part.Name == "GlitchVisualClone" then 
+						return true 
+					end
+					local current = part.Parent
+					while current and current ~= workspace do
+						if current:IsA("Model") and current.Name == "Stalker" then return true end
+						if current:IsA("Model") and Players:GetPlayerFromCharacter(current) then return true end
+						current = current.Parent
+					end
+					return false
+				end
+
+				local function setupVisualClone(part)
+					if visualClones[part] then return end
+
+					local clone = part:Clone()
+
+					for _, child in ipairs(clone:GetDescendants()) do
+						if child:IsA("LuaSourceContainer") or child:IsA("BodyMover") or child:IsA("Constraint") then
+							child:Destroy()
+						end
+					end
+
+					clone.CanCollide = false
+					clone.CanTouch = false
+					clone.CanQuery = false
+					clone.Anchored = true
+					clone.Name = "GlitchVisualClone"
+					clone.Transparency = 1
+					clone.Parent = part
+
+					visualClones[part] = {
+						Clone = clone,
+						OriginalSize = part.Size,
+						OriginalCFrame = part.CFrame,
+						OriginalColor = part.Color,
+						OriginalTransparency = part.Transparency
+					}
+				end
+
+				local function refreshCache()
+					local newTargets = {}
+					for _, part in ipairs(workspace:GetDescendants()) do
+						if not isExcluded(part) then
+							table.insert(newTargets, part)
+							setupVisualClone(part)
+						end
+					end
+					targetParts = newTargets
+				end
+
+				refreshCache()
+
+				local isRunning = true
+				task.spawn(function()
+					while isRunning do
+						task.wait(3)
+						if isRunning then refreshCache() end
+					end
+				end)
+
+				local heartbeatConnection
+
+				local function restoreNormal()
+					isRunning = false
+
+					if heartbeatConnection then
+						heartbeatConnection:Disconnect()
+						heartbeatConnection = nil
+					end
+
+					for part, data in pairs(visualClones) do
+						if part and part.Parent then
+							part.Transparency = data.OriginalTransparency
+						end
+						if data.Clone and data.Clone.Parent then
+							data.Clone:Destroy()
+						end
+					end
+
+					-- 3. Xóa UI và Sound
+					if sound then sound:Destroy() end
+					if screenGui then screenGui:Destroy() end
+
+				end
+
+				heartbeatConnection = RunService.Heartbeat:Connect(function()
+					local character = localPlayer.Character
+					local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+					if not rootPart then return end
+					local playerPosition = rootPart.Position
+
+					local elapsedTime = os.clock() - startTime
+					local progress = math.clamp(elapsedTime / GLITCH_DURATION, 0, 1)
+					local currentIntensity = GLITCH_INTENSITY * progress
+
+					for i = #targetParts, 1, -1 do
+						local part = targetParts[i]
+
+						if not part or not part.Parent then
+							table.remove(targetParts, i)
+							continue
+						end
+
+						local data = visualClones[part]
+						if data then
+							local clone = data.Clone
+							local distance = (part.Position - playerPosition).Magnitude
+
+							if distance <= MAX_DISTANCE then
+								part.Transparency = 1
+								clone.Transparency = data.OriginalTransparency
+
+								local shakeX = (random(-100, 100) / 100) * currentIntensity
+								local shakeY = (random(-100, 100) / 100) * currentIntensity
+								local shakeZ = (random(-100, 100) / 100) * currentIntensity
+
+								local offsetCFrame = CFrame.new(shakeX * 0.2, shakeY * 0.2, shakeZ * 0.2) 
+									* CFrame.Angles(math.rad(shakeX * 8), math.rad(shakeY * 8), math.rad(shakeZ * 8))
+
+								clone.CFrame = data.OriginalCFrame * offsetCFrame
+
+								if random() > 0.6 then
+									clone.Size = data.OriginalSize + vector3New(shakeX * 1.5, shakeY * 1.5, shakeZ * 1.5)
+								else
+									clone.Size = data.OriginalSize
+								end
+
+								for _, child in ipairs(clone:GetChildren()) do
+									if child:IsA("Texture") then
+										child.OffsetStudsU = random(-50, 50)
+										child.OffsetStudsV = random(-50, 50)
+										child.StudsPerTileU = random(5, 100) * 0.1
+										child.StudsPerTileV = random(5, 100) * 0.1
+									end
+								end
+							else
+								if part.Transparency ~= data.OriginalTransparency then
+									part.Transparency = data.OriginalTransparency
+									clone.Transparency = 1
+									clone.CFrame = data.OriginalCFrame
+									clone.Size = data.OriginalSize
+									clone.Color = data.OriginalColor
+								end
+							end
+						end
+					end
+				end)
+				task.delay(GLITCH_DURATION, restoreNormal)
+			end)
+			
 			task.wait(2)
 			if crucifixPart:FindFirstChild("Light") then
 				local mergeSound = Instance.new("Sound")
@@ -290,10 +493,8 @@ local function SpecialCrucifixion(entityModel, targetPart, crucifixTool)
 				mergeSound:Play()
 
 
-				-- 1. XÓA ENTITY MODEL
 				if entityModel then entityModel:Destroy() end
 
-				-- 2. TẠO RIÊNG MỖI BEAMCHAIN 1 PART TÀNG HÌNH VÀ TWEEN VỀ CHÍNH PART NGUỒN CỦA NÓ
 				for idx, info in ipairs(clonedBeams) do
 					local b = info.beam
 					local origP = info.originPart
@@ -496,7 +697,7 @@ local function spawnStalker()
 							executeCrucifixion(shockerModel, oogaBoogaaPart, equippedTool)
 						elseif toilet then
 							SpecialCrucifixion(shockerModel , oogaBoogaaPart , equippedTool)
-							else
+						else
 							task.spawn(function()
 								local currentHealth = humanoid.Health
 								if currentHealth <= 10 then
