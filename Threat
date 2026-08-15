@@ -272,6 +272,11 @@ entity:SetCallback("OnDamagePlayer", function(newHealth)
 			local screenGui523
 			task.wait(0.5)
 			tween:Destroy()
+
+            task.spawn(function()
+			local tween = TweenService:Create(humanoid, TweenInfo.new(10.5), {Health = 1})
+				tween:Play()
+			end)
 			
 			local sound = Instance.new("Sound",workspace)
 			sound.Volume = 10
