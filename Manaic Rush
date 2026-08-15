@@ -1,5 +1,4 @@
 game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
-
 	game.Lighting.MainColorCorrection.TintColor = Color3.fromRGB(255, 0, 0)
 	game.Lighting.MainColorCorrection.Contrast = 1
 	local tween = game:GetService("TweenService")
@@ -7,6 +6,14 @@ game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
 	local TweenService = game:GetService("TweenService")
 	local TW = TweenService:Create(game.Lighting.MainColorCorrection, TweenInfo.new(5),{TintColor = Color3.fromRGB(255, 255, 255)})
 	TW:Play()
+
+		local CameraShaker = require(game.ReplicatedStorage.CameraShaker)
+	local camara = game.Workspace.CurrentCamera
+	local camShake = CameraShaker.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
+		camara.CFrame = camara.CFrame * shakeCf
+	end)
+	camShake:Start()
+	camShake:ShakeOnce(20,10,0,4,0.2,0.2)
 
 	local sound = Instance.new("Sound")
 	sound.SoundId = "rbxassetid://106306557753297"
