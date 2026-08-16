@@ -1,7 +1,3 @@
-game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
-
-
-
 ---====== Load spawner ======---
 
 local spawner = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Entity%20Spawner/V2/Source.lua"))()
@@ -273,87 +269,87 @@ entity:SetCallback("OnDamagePlayer", function(newHealth)
 			task.wait(0.5)
 			tween:Destroy()
 
-            task.spawn(function()
-			local tween = TweenService:Create(humanoid, TweenInfo.new(10.5), {Health = 1})
+			task.spawn(function()
+				local tween = TweenService:Create(humanoid, TweenInfo.new(10.5), {Health = 1})
 				tween:Play()
 			end)
-			
+
 			local sound = Instance.new("Sound",workspace)
 			sound.Volume = 10
 			sound.SoundId = "rbxassetid://4443370219"
 			sound:Play()
-			
+
 			for _, descendant in ipairs(entityModel:GetDescendants()) do
 				if descendant:IsA("Sound") then
 					descendant.Playing = false
 					descendant.Volume = 0
 				end
 			end
-			
+
 			local targetCFrame = humanoidRootPart.CFrame
 			local tween = TweenService:Create(primaryPart, TweenInfo.new(10000000000000000, Enum.EasingStyle.Quad), {CFrame = targetCFrame})
 			tween:Play()
-			
+
 			task.spawn(function()
-			local function GetGitSound(GithubSnd, SoundName)
-				local url = GithubSnd
-				if not isfile(SoundName .. ".mp3") then
-					writefile(SoundName .. ".mp3", game:HttpGet(url))
+				local function GetGitSound(GithubSnd, SoundName)
+					local url = GithubSnd
+					if not isfile(SoundName .. ".mp3") then
+						writefile(SoundName .. ".mp3", game:HttpGet(url))
+					end
+					local sound = Instance.new("Sound")
+					sound.SoundId = (getcustomasset or getsynasset)(SoundName .. ".mp3")
+					return sound
 				end
-				local sound = Instance.new("Sound")
-				sound.SoundId = (getcustomasset or getsynasset)(SoundName .. ".mp3")
-				return sound
-			end
-			local Jumpscare = GetGitSound("https://github.com/eoyoustme/Mayhem-Remake/blob/main/ThreatKillYourLife.mp3?raw=true","ThreatKillYourLife")
-			Jumpscare.Parent = workspace
-			Jumpscare.Volume = 10
-			Jumpscare.PlaybackSpeed = 1
+				local Jumpscare = GetGitSound("https://github.com/eoyoustme/Mayhem-Remake/blob/main/ThreatKillYourLife.mp3?raw=true","ThreatKillYourLife")
+				Jumpscare.Parent = workspace
+				Jumpscare.Volume = 10
+				Jumpscare.PlaybackSpeed = 1
 				Jumpscare:Play()
-			
-				 DistortionSoundEffect = Instance.new("DistortionSoundEffect")
+
+				DistortionSoundEffect = Instance.new("DistortionSoundEffect")
 				DistortionSoundEffect.Parent = Jumpscare
 				DistortionSoundEffect.Level = 0
-			
+
 				local tween = TweenService:Create(DistortionSoundEffect, TweenInfo.new(9), {Level = 0.9})
 				tween:Play()
-				end)
+			end)
 			task.spawn(function()
-			local TweenService = game:GetService("TweenService")
-			local colorCorrection = game.Lighting:FindFirstChild("MainColorCorrection")
+				local TweenService = game:GetService("TweenService")
+				local colorCorrection = game.Lighting:FindFirstChild("MainColorCorrection")
 
-			if colorCorrection then
-				colorCorrection.TintColor = Color3.fromRGB(255, 255, 255)
-				colorCorrection.Contrast = 0
-				colorCorrection.Saturation = 0
+				if colorCorrection then
+					colorCorrection.TintColor = Color3.fromRGB(255, 255, 255)
+					colorCorrection.Contrast = 0
+					colorCorrection.Saturation = 0
 
-				local DURATION = 9
-				local START_DELAY = 1.0   
-				local MIN_DELAY = 0.0000001 
+					local DURATION = 9
+					local START_DELAY = 1.0   
+					local MIN_DELAY = 0.0000001 
 
-				local tween = TweenService:Create(colorCorrection, TweenInfo.new(DURATION), {Contrast = 4, Saturation = 1})
-				tween:Play()
+					local tween = TweenService:Create(colorCorrection, TweenInfo.new(DURATION), {Contrast = 4, Saturation = 1})
+					tween:Play()
 
-				task.spawn(function()
-					local startTime = os.clock()
+					task.spawn(function()
+						local startTime = os.clock()
 
-					while true do
-						local elapsed = os.clock() - startTime
-						if elapsed >= DURATION then
-							break
+						while true do
+							local elapsed = os.clock() - startTime
+							if elapsed >= DURATION then
+								break
+							end
+
+							colorCorrection.TintColor = Color3.fromRGB(math.random(0, 255), math.random(0, 255), math.random(0, 255))
+
+							local progress = math.clamp(elapsed / DURATION, 0, 1)
+							local currentDelay = START_DELAY + (MIN_DELAY - START_DELAY) * progress
+
+							task.wait(currentDelay)
 						end
 
-						colorCorrection.TintColor = Color3.fromRGB(math.random(0, 255), math.random(0, 255), math.random(0, 255))
-
-						local progress = math.clamp(elapsed / DURATION, 0, 1)
-						local currentDelay = START_DELAY + (MIN_DELAY - START_DELAY) * progress
-
-						task.wait(currentDelay)
-					end
-
-					colorCorrection.TintColor = Color3.fromRGB(255, 255, 255)
-				end)
+						colorCorrection.TintColor = Color3.fromRGB(255, 255, 255)
+					end)
 				end
-				end)
+			end)
 
 			entity:Pause()
 
@@ -367,9 +363,23 @@ entity:SetCallback("OnDamagePlayer", function(newHealth)
 				end
 				camera.CFrame = CFrame.lookAt(camera.CFrame.Position, primaryPart.Position) * CFrame.new(0, 1 ,0)
 			end)
-			
+
 			wait(4.5)
+			local Jumpscare55
 			task.spawn(function()
+				local function GetGitSound(GithubSnd, SoundName)
+					local url = GithubSnd
+					if not isfile(SoundName .. ".mp3") then
+						writefile(SoundName .. ".mp3", game:HttpGet(url))
+					end
+					local sound = Instance.new("Sound")
+					sound.SoundId = (getcustomasset or getsynasset)(SoundName .. ".mp3")
+					return sound
+				end
+				Jumpscare55 = GetGitSound("https://github.com/eoyoustme/Mayhem-Remake/blob/main/TWisterKillYourLife.mp3?raw=true","Thatwhyyoutmamadead")
+				Jumpscare55.Parent = workspace
+				Jumpscare55.Volume = 10
+				Jumpscare55:Play()
 				local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 				screenGui523 = Instance.new("ScreenGui")
 				screenGui523.Name = "JumpscareOverlay"
@@ -400,10 +410,11 @@ entity:SetCallback("OnDamagePlayer", function(newHealth)
 				end
 			end)
 			wait(4.5)
+			Jumpscare55:Destroy()
 			sound:Destroy()
 			screenGui523:Destroy()
 			DistortionSoundEffect.Level = 0
-			
+
 			game.SoundService.AmbientReverb = Enum.ReverbType.Arena
 
 			local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
@@ -461,11 +472,11 @@ entity:SetCallback("OnDamagePlayer", function(newHealth)
 			if humanoid then humanoid.Health = 0 end
 			wait(0.5)
 			task.spawn(function()
-			local tween = TweenService:Create(Smiler, TweenInfo.new(1), {ImageTransparency = 1})
+				local tween = TweenService:Create(Smiler, TweenInfo.new(1), {ImageTransparency = 1})
 				tween:Play()
 			end)
 			task.spawn(function()
-			local tween = TweenService:Create(frame, TweenInfo.new(1), {BackgroundTransparency = 1})
+				local tween = TweenService:Create(frame, TweenInfo.new(1), {BackgroundTransparency = 1})
 				tween:Play()
 			end)
 			wait(1)
