@@ -47,7 +47,7 @@ local entity = Spawner:Create({
 	Damage = {
 		Enabled = true,
 		Range = 40,
-		Amount = 125
+		Amount = 0.001
 	},
 	Crucifixion = {
 		Enabled = true,
@@ -163,6 +163,10 @@ end)
 entity:SetCallback("OnDamagePlayer", function(newHealth: number)
 	if newHealth <= 0 then
 		print("Entity has killed the player")
+
+	else
+		print("Entity has damaged the player")
+		entity:Pause()
 		local ReplicatedStorage = game:GetService("ReplicatedStorage")
 		local Players = game:GetService("Players")
 		local TweenService = game:GetService("TweenService")
@@ -177,25 +181,22 @@ entity:SetCallback("OnDamagePlayer", function(newHealth: number)
 		screenGui.DisplayOrder = 999999
 		screenGui.Parent = playerGui
 
-		-- Label chứa chuỗi ảnh Jumpscare
+		local frame = Instance.new("Frame")
+		frame.Size = UDim2.new(1, 0, 1, 0)
+		frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+		frame.BackgroundTransparency = 0
+		frame.BorderSizePixel = 0
+		frame.Parent = screenGui
+
 		local imageLabel = Instance.new("ImageLabel")
 		imageLabel.BackgroundTransparency = 1
 		imageLabel.BorderSizePixel = 0
 		imageLabel.Position = UDim2.new(0, 0, 0, 0)
 		imageLabel.Size = UDim2.new(1, 0, 1, 0)
 		imageLabel.ScaleType = Enum.ScaleType.Stretch
-		imageLabel.ImageTransparency = 0 -- [ĐÃ SỬA]: Chuyển từ 1 sang 0 để hiển thị ảnh Jumpscare!
+		imageLabel.ImageTransparency = 1
 		imageLabel.Visible = true
 		imageLabel.Parent = screenGui
-
-		local cue2 = Instance.new("Sound")
-		cue2.Parent = game.Workspace
-		cue2.Name = "Spawn"
-		cue2.SoundId = "rbxassetid://140708560546036"
-		cue2.Volume = 10
-		cue2.TimePosition = 0
-		cue2.PlaybackSpeed = 0.7
-		cue2:Play()
 
 		local rebound = Instance.new("ImageLabel")
 		rebound.Image = "rbxassetid://12671469360"
@@ -204,51 +205,115 @@ entity:SetCallback("OnDamagePlayer", function(newHealth: number)
 		rebound.AnchorPoint = Vector2.new(0.5, 0.5)
 		rebound.BackgroundTransparency = 1
 		rebound.ResampleMode = Enum.ResamplerMode.Pixelated
-		rebound.ImageTransparency = 1 
+		rebound.ImageTransparency = 0
 		rebound.ZIndex = 1000
 		rebound.Parent = screenGui
 
+		local function GetGitSound(GithubSnd, SoundName)
+			local url = GithubSnd
+			if not isfile(SoundName .. ".mp3") then
+				writefile(SoundName .. ".mp3", game:HttpGet(url))
+			end
+			local sound = Instance.new("Sound")
+			sound.SoundId = (getcustomasset or getsynasset)(SoundName .. ".mp3")
+			return sound
+		end
+		local Jumpscare = GetGitSound("https://github.com/eoyoustme/Mayhem-Remake/blob/main/TWisterKillYourLife.mp3?raw=true","Thatwhyyoutmamadead")
+		Jumpscare.Parent = workspace
+		Jumpscare.Volume = 10
+
+		local function GetGitSound(GithubSnd, SoundName)
+			local url = GithubSnd
+			if not isfile(SoundName .. ".mp3") then
+				writefile(SoundName .. ".mp3", game:HttpGet(url))
+			end
+			local sound = Instance.new("Sound")
+			sound.SoundId = (getcustomasset or getsynasset)(SoundName .. ".mp3")
+			return sound
+		end
+		local Jumpscare12 = GetGitSound("https://github.com/eoyoustme/rebouna/blob/main/1382827.mp3?raw=true","staticofdead")
+		Jumpscare12.Parent = workspace
+		Jumpscare12.Volume = 6
+		Jumpscare12:Play()
+
 		local jumpscareImages = {
-			"rbxassetid://15813725670",
+			"rbxassetid://14577304668",
 			"rbxassetid://15813727511",
 			"rbxassetid://15813727319",
-			"rbxassetid://15813727319",
-			"rbxassetid://15813726972",
+			"rbxassetid://17400340074",
+			"rbxassetid://12710989538",
 			"rbxassetid://15813726866",
 			"rbxassetid://15813726700",
-			"rbxassetid://15813726584",
-			"rbxassetid://15813726463",
+			"rbxassetid://85325712385294",
+			"rbxassetid://132173691110215",
 			"rbxassetid://15813726313",
 			"rbxassetid://15813726068",
-			"rbxassetid://15813725870"
+			"rbxassetid://73640229281491"
 		}
 
-		local flashDuration = 1.6
+		local TwisterChange = {
+			"rbxassetid://99082560138711",
+			"rbxassetid://12671469360"
+		}
 
-		local tweenIn = TweenInfo.new(1.6, Enum.EasingStyle.Linear)
-		TweenService:Create(rebound, tweenIn, {ImageTransparency = 0}):Play()
 
-		local start = os.clock()
+		for i=1 , Random.new():NextInteger(2,6) do
+			local flashDuration = Random.new():NextNumber(0.1,0.6)
+			task.spawn(function()
+				local tweenIn = TweenInfo.new(Random.new():NextNumber(0.1,0.6), Enum.EasingStyle.Linear)
+				TweenService:Create(imageLabel, tweenIn, {ImageTransparency = 0}):Play()
+				wait(Random.new():NextNumber(0.1,0.6))
+				local tweenout = TweenInfo.new(Random.new():NextNumber(0.1,0.6), Enum.EasingStyle.Linear)
+				TweenService:Create(imageLabel, tweenout, {ImageTransparency = 1}):Play()
+			end)
+			Jumpscare:Play()
 
-		while os.clock() - start < flashDuration do
-			for _, imgId in ipairs(jumpscareImages) do
-				imageLabel.Image = imgId
-				task.wait(0.03)
+
+			local start = os.clock()
+
+			while os.clock() - start < flashDuration do
+				for _, imgId in ipairs(jumpscareImages) do
+					imageLabel.Image = imgId
+					task.spawn(function()
+						local origin = rebound.Position
+						for _, imageidid in ipairs(TwisterChange) do
+							rebound.Image = imageidid
+							rebound.Rotation = math.random(-8, 8)
+							rebound.Position = origin + UDim2.new(0, math.random(-40, 40), 0, math.random(-40, 40))
+							rebound.Position = origin + UDim2.new(0, math.random(-40, 40), 0, math.random(-40, 40))
+							rebound.Position = origin + UDim2.new(0, math.random(-40, 40), 0, math.random(-40, 40))
+							task.wait(0)
+						end
+					end)
+
+					task.wait(0.03)
+				end
+				rebound.Position = UDim2.new(0.5, 0, 0.5, 0)
+				rebound.Rotation = 0
+				Jumpscare:Stop()
+				task.wait(Random.new():NextNumber(0.1,2))
 			end
 		end
+		Jumpscare12:Destroy()
+		
+		local cue266 = Instance.new("Sound")
+		cue266.Parent = workspace
+		cue266.Name = "Spawn"
+		cue266.SoundId = "rbxassetid://6351509719"
+		cue266.Volume = 10
+		cue266.TimePosition = 0
+		cue266.PlaybackSpeed = 1
+		cue266:Play()
+		
+		frame.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+		
+		wait(1)
 		
 		local playerGui = player:WaitForChild("PlayerGui")
-		local screenGui = Instance.new("ScreenGui")
-		screenGui.Name = "FlashOverlay"
-		screenGui.IgnoreGuiInset = true
-		screenGui.Parent = playerGui
-
-		local frame = Instance.new("Frame")
-		frame.Size = UDim2.new(1, 0, 1, 0)
-		frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-		frame.BackgroundTransparency = 0
-		frame.BorderSizePixel = 0
-		frame.Parent = screenGui
+		local screenGui5 = Instance.new("ScreenGui")
+		screenGui5.Name = "FlashOverlay"
+		screenGui5.IgnoreGuiInset = true
+		screenGui5.Parent = playerGui
 
 		local cue2 = Instance.new("Sound")
 		cue2.Parent = game
@@ -256,15 +321,14 @@ entity:SetCallback("OnDamagePlayer", function(newHealth: number)
 		cue2.SoundId = "rbxasset://textures/0e828935720d2808f68a635c63293576481dcf474b645b34acf2d63f53d598b2.mp3"
 		cue2.Volume = 10
 		cue2.TimePosition = 0
-		cue2.PlaybackSpeed = 1
+		cue2.PlaybackSpeed = Random.new():NextNumber(0.1,1)
 		cue2:Play()
 
 		task.wait(0.3)
-		screenGui:Destroy()
-
 		game:Shutdown()
-	else
-		print("Entity has damaged the player")
+		screenGui:Destroy()
+		screenGui5:Destroy()
+		Jumpscare:Destroy()
 	end
 end)
 
