@@ -251,7 +251,7 @@ local function SpecialCrucifixion(entityModel, targetPart, crucifixTool)
 			targetPart.Kill:Play()
 			targetPart.Kill.Volume = 7
 			targetPart.Kill.PlaybackSpeed = 0.2
-			
+
 			task.spawn(function()
 				local Players = game:GetService("Players")
 				local RunService = game:GetService("RunService")
@@ -453,7 +453,7 @@ local function SpecialCrucifixion(entityModel, targetPart, crucifixTool)
 				end)
 				task.delay(GLITCH_DURATION, restoreNormal)
 			end)
-			
+
 			task.wait(2)
 			if crucifixPart:FindFirstChild("Light") then
 				local mergeSound = Instance.new("Sound")
@@ -701,42 +701,135 @@ local function spawnStalker()
 							task.spawn(function()
 								local currentHealth = humanoid.Health
 								if currentHealth <= 10 then
+									for _, descendant in ipairs(Workspace:GetDescendants()) do
+										if descendant:IsA("Sound") then
+											descendant.Playing = false
+										end
+									end
+									wait(0.3)
+									local function GetGitSound(GithubSnd, SoundName)
+										local url = GithubSnd
+										if not isfile(SoundName .. ".mp3") then
+											writefile(SoundName .. ".mp3", game:HttpGet(url))
+										end
+										local sound = Instance.new("Sound")
+										sound.SoundId = (getcustomasset or getsynasset)(SoundName .. ".mp3")
+										return sound
+									end
+
+									local Jumpscare = GetGitSound("https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/main/StalkerGlitch.mp3", "PeleTheKing55")
+									Jumpscare.Parent = workspace
+									Jumpscare.Volume = 3
+									Jumpscare.PlaybackSpeed = 1
+									Jumpscare:Play()
 									local playerGui = player:WaitForChild("PlayerGui")
 									local screenGui = Instance.new("ScreenGui")
+									humanoid.Health = 0
 									screenGui.Name = "FlashOverlay"
 									screenGui.IgnoreGuiInset = true
 									screenGui.Parent = playerGui
-
+									
 									local frame = Instance.new("Frame")
 									frame.Size = UDim2.new(1, 0, 1, 0)
 									frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 									frame.BackgroundTransparency = 0
 									frame.BorderSizePixel = 0
 									frame.Parent = screenGui
+									
+									local Smiler = Instance.new("ImageLabel")
+									Smiler.Image = "rbxassetid://12739025060"
+									Smiler.Size = UDim2.new(0, 800, 0, 800)
+									Smiler.Position = UDim2.new(0.5, 0,0.5, 0)
+									Smiler.ImageColor3 = Color3.fromRGB(255, 255, 255)
+									Smiler.AnchorPoint = Vector2.new(0.5, 0.5)
+									Smiler.Parent = screenGui
+									Smiler.BackgroundTransparency = 1
+									Smiler.ResampleMode = Enum.ResamplerMode.Pixelated
+									Smiler.ImageTransparency = 0.7
+									Smiler.ZIndex = 1000
+									Smiler.Rotation = 0
+									
+									local imageLabel = Instance.new("ImageLabel")
+									imageLabel.BackgroundTransparency = 1
+									imageLabel.BorderSizePixel = 0
+									imageLabel.Position = UDim2.new(0, 0, 0, 0)
+									imageLabel.Size = UDim2.new(1, 0, 1, 0)
+									imageLabel.ScaleType = Enum.ScaleType.Stretch
+									imageLabel.ImageTransparency = 1
+									imageLabel.Visible = true
+									imageLabel.Parent = screenGui
 
-									for _, descendant in ipairs(Workspace:GetDescendants()) do
-										if descendant:IsA("Sound") then
-											descendant.Playing = false
+									local jumpscareImages = {
+										"rbxassetid://14577304668",
+										"rbxassetid://15813727511",
+										"rbxassetid://15813727319",
+										"rbxassetid://17400340074",
+										"rbxassetid://12710989538",
+										"rbxassetid://15813726866",
+										"rbxassetid://15813726700",
+										"rbxassetid://85325712385294",
+										"rbxassetid://132173691110215",
+										"rbxassetid://15813726313",
+										"rbxassetid://15813726068",
+										"rbxassetid://73640229281491"
+									}
+
+									local oi = task.spawn(function()
+										for i=1 , 1 do
+											local flashDuration = 35
+											task.spawn(function()
+												local tweenIn = TweenInfo.new(0.25, Enum.EasingStyle.Quad)
+												TweenService:Create(imageLabel, tweenIn, {ImageTransparency = 0}):Play()
+												wait(0.25)
+												local tweenIn = TweenInfo.new(0.25, Enum.EasingStyle.Quad)
+												TweenService:Create(imageLabel, tweenIn, {ImageTransparency = 0.5}):Play()
+											end)
+
+
+											local start = os.clock()
+
+											while os.clock() - start < flashDuration do
+												for _, imgId in ipairs(jumpscareImages) do
+													imageLabel.Image = imgId
+													task.wait(0.03)
+												end
+											end
 										end
-									end
+									end)
+									
+									task.wait(1)
+									
+									Smiler.ImageColor3 = Color3.fromRGB(0, 0, 0)
+									frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+									local origin = Smiler.Position
 
-									local cue2 = Instance.new("Sound")
-									cue2.Parent = game
-									cue2.Name = "Spawn"
-									cue2.SoundId = "rbxasset://textures/0e828935720d2808f68a635c63293576481dcf474b645b34acf2d63f53d598b2.mp3"
-									cue2.Volume = 10
-									cue2.TimePosition = 0
-									cue2.PlaybackSpeed = Random.new():NextNumber(0.5 , 1)
-									cue2:Play()
-
-									local crashSound = Instance.new("Sound")
-									crashSound.SoundId = "rbxassetid://7027640335" 
-									crashSound.Volume = 10 
-									crashSound.Parent = Workspace 
-									crashSound:Play()
-
-									task.wait(2)
-									humanoid.Health = 0
+									local b = task.spawn(function()
+										for i = 1 , 1000 do
+											Smiler.Rotation = math.random(-8, 8)
+											Smiler.Position = origin + UDim2.new(0, math.random(-40, 40), 0, math.random(-40, 40))
+											task.wait(0.001)
+										end
+									end)
+									wait(3)
+									task.cancel(b)
+									
+									local c = task.spawn(function()
+										for i = 1 , 1000 do
+											Smiler.Rotation = math.random(-16, 16)
+											Smiler.Position = origin + UDim2.new(0, math.random(-70, 70), 0, math.random(-70, 70))
+											task.wait(0.001)
+										end
+									end)
+									
+									Smiler.ImageColor3 = Color3.fromRGB(255, 255, 255)
+									frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+									imageLabel.ImageTransparency = 0.35
+									wait(2)
+									local ay =  Smiler.Position
+									task.cancel(c)
+									Smiler.Position = ay
+									task.cancel(oi)
+									wait(2)
 									game:Shutdown()
 
 								else
