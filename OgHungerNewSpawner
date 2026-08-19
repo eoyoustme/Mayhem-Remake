@@ -7,7 +7,6 @@
   \____/ \_____| |_|  |_|\_/\_/\_/\_/_____|______|_|  \_\  \_/\_/|______|\_/\_/ 
 ]]--
 
-
 if getgenv().OgHungerNewSpawner then return getgenv().OgHungerNewSpawner end
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Functions.lua"))()
@@ -36,6 +35,8 @@ local Camera = workspace.CurrentCamera
 local Remotes = ReplicatedStorage:WaitForChild("RemotesFolder") :: Folder
 local GameStats = ReplicatedStorage:WaitForChild("GameStats") :: Folder
 local CurrentRooms = workspace:WaitForChild("CurrentRooms") :: Folder
+local GameData = ReplicatedStorage:WaitForChild("GameData", 10) :: Folder
+local LatestRoomValue = GameData and GameData:WaitForChild("LatestRoom", 10) :: IntValue
 
 local Assets = {
 	Repentance = LoadCustomInstance(ROOT.."/Assets/Repentance.rbxm"),
@@ -1326,7 +1327,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
     model:SetAttribute("Running", true)
     self.ActiveEntities[#self.ActiveEntities + 1] = entity
 
-    -- === XỬ LÝ REBOUND MOVE STYLE (KHI MỞ CỬA SPAWN TẾP) ===
+    -- === XỬ LÝ REBOUND MOVE STYLE (KHI MỞ CỬA SPAWN TẬP) ===
     if config.Movement.ReboundMoveStyle and not isReboundRespawn and not model:GetAttribute("ReboundStyleStarted") then
         model:SetAttribute("ReboundStyleStarted", true)
         
@@ -1363,7 +1364,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
                     local newEntity = Module:Create(config)
                     if newEntity then
                         newEntity.Debug = CloneTable(entity.Debug)
-                        Module:Run(newEntity, false, true) -- Chuyền true vào isReboundRespawn
+                        Module:Run(newEntity, false, true) -- Chuyển true vào isReboundRespawn
                     else
                         warn("[Spawner Debug] Khong the tao newEntity!")
                     end
@@ -1590,10 +1591,42 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
         local reboundType = config.Rebounding.Type:upper()
         if reboundType == "AMBUSH" then
             local pathfindNodes = GetPathfindNodesAmbush(config)
-            for _, v in next, pathfindNodes do
-                local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                EntityMoveTo(model, cframe, config)
-                task.spawn(entity.RunCallback, entity, "OnReachNode", v)
+
+            -- === BẮT SỰ KIỆN KHI CÓ PHÒNG MỚI ĐƯỢC TẠO DÙNG LatestRoom.Changed ===
+            local newRoomConnection
+            if LatestRoomValue then
+                newRoomConnection = LatestRoomValue.Changed:Connect(function(roomVal)
+                    if not entity:IsAlive() or model:GetAttribute("Despawning") then
+                        if newRoomConnection then newRoomConnection:Disconnect() end
+                        return
+                    end
+
+                    local newRoom = CurrentRooms:FindFirstChild(tostring(roomVal)) or GetCurrentRoom(true)
+                    if newRoom then
+                        local newNodes = GetNodesFromRoom(newRoom, config.Movement.Reversed, config)
+                        for _, node in ipairs(newNodes) do
+                            if not table.find(pathfindNodes, node) then
+                                table.insert(pathfindNodes, node)
+                            end
+                        end
+                    end
+                end)
+            end
+
+            -- Dùng vòng lặp while động để chạy theo số lượng nodes tăng thêm khi mở phòng mới
+            local nodeIndex = 1
+            while nodeIndex <= #pathfindNodes and entity:IsAlive() do
+                local v = pathfindNodes[nodeIndex]
+                if v and v.Parent then
+                    local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+                    EntityMoveTo(model, cframe, config)
+                    task.spawn(entity.RunCallback, entity, "OnReachNode", v)
+                end
+                nodeIndex = nodeIndex + 1
+            end
+
+            if newRoomConnection then
+                newRoomConnection:Disconnect()
             end
             
             if config.Rebounding.Enabled then
@@ -1603,8 +1636,8 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
                     model:SetAttribute("Damage", true)
                     task.spawn(entity.RunCallback, entity, "OnRebounding", true)
 
-                    for i = #pathfindNodes, 1, -1 do
-                        local v = pathfindNodes[i]
+                    for j = #pathfindNodes, 1, -1 do
+                        local v = pathfindNodes[j]
                         local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
                         EntityMoveTo(model, cframe, config)
                         task.spawn(entity.RunCallback, entity, "OnReachNode", v)
@@ -1616,10 +1649,15 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
                     task.spawn(entity.RunCallback, entity, "OnRebounding", true)
                     pathfindNodes = GetPathfindNodesAmbush(config)
 
-                    for _, v in next, pathfindNodes do
-                        local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                        EntityMoveTo(model, cframe, config)
-                        task.spawn(entity.RunCallback, entity, "OnReachNode", v)
+                    local reIndex = 1
+                    while reIndex <= #pathfindNodes and entity:IsAlive() do
+                        local v = pathfindNodes[reIndex]
+                        if v and v.Parent then
+                            local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+                            EntityMoveTo(model, cframe, config)
+                            task.spawn(entity.RunCallback, entity, "OnReachNode", v)
+                        end
+                        reIndex = reIndex + 1
                     end
 
                     task.spawn(entity.RunCallback, entity, "OnRebounding", false)
