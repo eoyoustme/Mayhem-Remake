@@ -87,7 +87,24 @@ local CONST = {
 				Enabled = true,
 				Range = 40,
 				Amount = 125,
-				IgnoreHiding = false
+				IgnoreHiding = false,
+				JumpscareRipper = {
+					Enabled = false,
+					TargetPartName = "Ripe",
+					AttachmentName = "Attachment",
+					ParticleName = "ParticleEmitter",
+					ParticleTexture = "rbxassetid://12737595583",
+					SoundUrl = "https://github.com/eoyoustme/back/raw/main/Kill_with_static.mp3",
+					SlamSoundId = "rbxassetid://1837829565",
+					EndSoundId = "rbxassetid://4988621968",
+					Images = {
+						"rbxassetid://8482795900",
+						"rbxassetid://236542974",
+						"rbxassetid://184251462",
+						"rbxassetid://236777652"
+					},
+					FlashDuration = 1.6
+				}
 			},
 			Jumpscare = {
 				Enabled = false,
@@ -306,6 +323,224 @@ local function PlayJumpscare(config: any)
 
 	if sound1 then sound1:Destroy() end
 	if sound2 then sound2:Destroy() end
+end
+
+local function PlayRipperJumpscare(entity: any)
+	local config = entity.Config
+	local ripperConfig = config.Damage.JumpscareRipper or {}
+	local entityModel = entity.Model
+
+	task.spawn(function()
+		local player = LocalPlayer
+		local character = Character
+		local humanoid = Humanoid
+		local humanoidRootPart = RootPart
+		local camera = Camera
+
+		local targetPartName = ripperConfig.TargetPartName or "Ripe"
+		local primaryPart = entityModel.PrimaryPart or entityModel:FindFirstChild(targetPartName, true) or entityModel:FindFirstChildWhichIsA("BasePart", true)
+
+		if not (entityModel and humanoid and humanoidRootPart and primaryPart and camera) then return end
+
+		local originalWalkSpeed = humanoid.WalkSpeed
+		local originalJumpPower = humanoid.JumpPower
+		humanoid.WalkSpeed = 0
+		humanoid.JumpPower = 0
+
+		local controlsModule
+		pcall(function()
+			controlsModule = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule")):GetControls()
+			controlsModule:Disable()
+		end)
+
+		local function SetAllParticlesTimeScale(mdl, timescale)
+			for _, descendant in ipairs(mdl:GetDescendants()) do
+				if descendant:IsA("ParticleEmitter") then
+					descendant.TimeScale = timescale
+				end
+			end
+		end
+
+		SetAllParticlesTimeScale(entityModel, 1)
+
+		local to = true
+		task.spawn(function()
+			while to and primaryPart and primaryPart.Parent and humanoidRootPart and humanoidRootPart.Parent do
+				local targetCFrame = humanoidRootPart.CFrame
+				local tween = TweenService:Create(primaryPart, TweenInfo.new(2000000000000, Enum.EasingStyle.Quad), {CFrame = targetCFrame})
+				tween:Play()
+				tween.Completed:Wait()
+			end
+		end)
+
+		local attachName = ripperConfig.AttachmentName or "Attachment"
+		local ripeAttachment = primaryPart:FindFirstChild(attachName, true)
+		if ripeAttachment then
+			local particleName = ripperConfig.ParticleName or "ParticleEmitter"
+			local emitter = ripeAttachment:FindFirstChild(particleName)
+			if emitter and emitter:IsA("ParticleEmitter") then
+				if ripperConfig.ParticleTexture and ripperConfig.ParticleTexture ~= "" then
+					emitter.Texture = ripperConfig.ParticleTexture
+				end
+				emitter.Size = NumberSequence.new(10)
+				emitter.Squash = NumberSequence.new(0)
+				emitter.Enabled = true
+				emitter:Emit(20)
+				task.wait(0.1)
+				emitter.TimeScale = 0
+			end
+		end
+
+		pcall(function()
+			local CameraShaker = require(ReplicatedStorage:WaitForChild("CameraShaker"))
+			local camShake = CameraShaker.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
+				camera.CFrame = camera.CFrame * shakeCf
+			end)
+			camShake:Start()
+			camShake:ShakeOnce(15, 25, 0, 2, 1, 6)
+		end)
+
+		camera.CameraType = Enum.CameraType.Scriptable
+
+		local lockConnection
+		lockConnection = RunService.RenderStepped:Connect(function()
+			if not primaryPart or not primaryPart.Parent then
+				if lockConnection then lockConnection:Disconnect() end
+				return
+			end
+			camera.CFrame = CFrame.lookAt(camera.CFrame.Position, primaryPart.Position)
+		end)
+
+		task.wait(0.35)
+		if primaryPart and primaryPart.Parent then
+			camera.CFrame = CFrame.lookAt(camera.CFrame.Position, primaryPart.Position)
+		end
+
+		SetAllParticlesTimeScale(entityModel, 0)
+
+		local function GetGitSound(GithubSnd, SoundName)
+			local url = GithubSnd
+			if isfile and writefile and (getcustomasset or getsynasset) then
+				if not isfile(SoundName .. ".mp3") then
+					writefile(SoundName .. ".mp3", game:HttpGet(url))
+				end
+				local sound = Instance.new("Sound")
+				sound.SoundId = (getcustomasset or getsynasset)(SoundName .. ".mp3")
+				return sound
+			end
+			return nil
+		end
+
+		local Jumpscare
+		if ripperConfig.SoundUrl and ripperConfig.SoundUrl ~= "" then
+			pcall(function()
+				Jumpscare = GetGitSound(ripperConfig.SoundUrl, "Kill_Static")
+			end)
+		end
+		if not Jumpscare then
+			Jumpscare = Instance.new("Sound")
+			Jumpscare.SoundId = ripperConfig.SoundId or "rbxassetid://0"
+		end
+		Jumpscare.Parent = workspace
+		Jumpscare.Volume = 1
+		Jumpscare.PlaybackSpeed = 1
+
+		local slam = Instance.new("Sound")
+		slam.SoundId = ripperConfig.SlamSoundId or "rbxassetid://1837829565"
+		slam.Volume = 10
+		slam.Parent = workspace
+		slam:Play()
+
+		for _, descendant in ipairs(entityModel:GetDescendants()) do
+			if descendant:IsA("Sound") then
+				descendant.Playing = false
+				descendant.Volume = 0
+			end
+		end
+
+		Jumpscare:Play()
+
+		task.wait(1)
+
+		local screenGui = Instance.new("ScreenGui")
+		screenGui.Name = "JumpscareOverlay"
+		screenGui.IgnoreGuiInset = true
+		screenGui.DisplayOrder = 999999
+		screenGui.Parent = player:WaitForChild("PlayerGui")
+
+		local imageLabel = Instance.new("ImageLabel")
+		imageLabel.BackgroundTransparency = 1
+		imageLabel.BorderSizePixel = 0
+		imageLabel.Position = UDim2.new(0, 0, 0, 0)
+		imageLabel.Size = UDim2.new(1, 0, 1, 0)
+		imageLabel.ScaleType = Enum.ScaleType.Stretch
+		imageLabel.ImageTransparency = 1
+		imageLabel.Visible = true
+		imageLabel.Parent = screenGui
+
+		local images = ripperConfig.Images or {
+			"rbxassetid://8482795900",
+			"rbxassetid://236542974",
+			"rbxassetid://184251462",
+			"rbxassetid://236777652"
+		}
+
+		local flashDuration = ripperConfig.FlashDuration or 1.6
+
+		imageLabel.Image = images[1] or "rbxassetid://8482795900"
+		local tweenIn = TweenInfo.new(0.8, Enum.EasingStyle.Linear)
+		TweenService:Create(imageLabel, tweenIn, {ImageTransparency = 0}):Play()
+
+		local start = tick()
+
+		while tick() - start < flashDuration do
+			for _, imgId in ipairs(images) do
+				imageLabel.Image = imgId
+				RunService.RenderStepped:Wait()
+			end
+		end
+
+		imageLabel.ImageTransparency = 1
+		task.wait(0)
+
+		to = false
+
+		if humanoid then humanoid.Health = 0 end
+
+		local deathCause = config.Death.Cause ~= "" and config.Death.Cause or "Ripper"
+		pcall(function()
+			GameStats["Player_".. player.Name].Total.DeathCause.Value = deathCause
+		end)
+
+		local sound = Instance.new("Sound")
+		sound.SoundId = ripperConfig.EndSoundId or "rbxassetid://4988621968"
+		sound.Volume = 10
+		sound.PlaybackSpeed = 0.7
+		sound.Parent = workspace
+		sound:Play()
+
+		if entityModel and entityModel.Parent then
+			entityModel:Destroy()
+		end
+
+		if lockConnection then
+			lockConnection:Disconnect()
+		end
+
+		camera.CameraType = Enum.CameraType.Custom
+
+		if screenGui and screenGui.Parent then
+			screenGui:Destroy()
+		end
+
+		if humanoid and humanoid.Health > 0 then
+			humanoid.WalkSpeed = originalWalkSpeed
+			humanoid.JumpPower = originalJumpPower
+			if controlsModule then
+				pcall(function() controlsModule:Enable() end)
+			end
+		end
+	end)
 end
 
 local function CloneTable(tbl: any): any
@@ -1222,8 +1457,11 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
                 and not usedCrucifix
             then
                 local damage = config.Damage
+                local ripper = damage.JumpscareRipper
+                local isDamageActive = damage.Enabled or (ripper and ripper.Enabled)
+
                 if
-                    damage.Enabled
+                    isDamageActive
                     and damage.Range > 0
                     and Humanoid.Health > 0
                     and (not Character:GetAttribute("Hiding") or damage.IgnoreHiding)
@@ -1233,7 +1471,11 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
                     and inSight
                 then
                     model:SetAttribute("Damage", false)
-                    DamagePlayer(entity)
+                    if ripper and ripper.Enabled then
+                        PlayRipperJumpscare(entity)
+                    else
+                        DamagePlayer(entity)
+                    end
                 end
             end
 
