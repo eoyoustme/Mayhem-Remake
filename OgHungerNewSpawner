@@ -46,7 +46,7 @@ local Modules = {
 	Main_Game = require(PlayerGui.MainUI.Initiator.Main_Game :: ModuleScript)
 }
 local Storage = {
-    Ambient = {},
+	Ambient = {},
 	DeathTypes = {
 		["Yellow"] = {"yellow", "curious"},
 		["Blue"] = {"blue", "guiding"}
@@ -190,34 +190,37 @@ local CONST = {
 }
 
 local Module = {
-    ActiveEntities = {}
+	ActiveEntities = {}
 }
 
 -- \\ Helper Functions // --
 
 local function GetSortedRooms(): { Model }
-    local rooms = CurrentRooms:GetChildren()
-    table.sort(rooms, function(a, b)
-        local numA = tonumber(a.Name) or 0
-        local numB = tonumber(b.Name) or 0
-        return numA < numB
-    end)
-    return rooms
+	local rooms = CurrentRooms:GetChildren()
+	table.sort(rooms, function(a, b)
+		local numA = tonumber(a.Name) or 0
+		local numB = tonumber(b.Name) or 0
+		return numA < numB
+	end)
+	return rooms
 end
 
 local function GetCurrentRoom(latest: boolean): Model?
-    local sortedRooms = GetSortedRooms()
-    if #sortedRooms == 0 then return nil end
+	if latest then
+		-- Lấy phòng mới nhất trực tiếp từ ReplicatedStorage của DOORS
+		local latestRoomNum = GameData and GameData:FindFirstChild("LatestRoom") and GameData.LatestRoom.Value
+		if latestRoomNum then
+			return CurrentRooms:FindFirstChild(tostring(latestRoomNum))
+		end
+		local sortedRooms = GetSortedRooms()
+		return sortedRooms[#sortedRooms]
+	end
 
-    if latest then
-        return sortedRooms[#sortedRooms]
-    end
-    
-    local currentRoomNum = LocalPlayer:GetAttribute("CurrentRoom")
-    if currentRoomNum then
-        return CurrentRooms:FindFirstChild(tostring(currentRoomNum))
-    end
-    return nil
+	local currentRoomNum = LocalPlayer:GetAttribute("CurrentRoom")
+	if currentRoomNum then
+		return CurrentRooms:FindFirstChild(tostring(currentRoomNum))
+	end
+	return nil
 end
 
 local function loadSound(soundId: string): Sound?
@@ -553,35 +556,35 @@ local function PlayRipperJumpscare(entity: any)
 end
 
 local function CloneTable(tbl: any): any
-    local new = {}
-    for key, value in next, tbl do
-        if typeof(value) == "table" then
-            new[key] = CloneTable(value)
-        else
-            new[key] = value
-        end
-    end
-    return new
+	local new = {}
+	for key, value in next, tbl do
+		if typeof(value) == "table" then
+			new[key] = CloneTable(value)
+		else
+			new[key] = value
+		end
+	end
+	return new
 end
 
 function ApplyConfigDefaults(tbl, defaults)
-    local new = CloneTable(tbl)
-    for key, value in next, defaults do
-        if new[key] == nil then
-            if typeof(value) == "table" then
-                new[key] = CloneTable(value)
-            else
-                new[key] = value
-            end
+	local new = CloneTable(tbl)
+	for key, value in next, defaults do
+		if new[key] == nil then
+			if typeof(value) == "table" then
+				new[key] = CloneTable(value)
+			else
+				new[key] = value
+			end
 
-        elseif typeof(value) == "table" then
-            if typeof(new[key]) ~= "table" then
-                new[key] = {}
-            end
-            new[key] = ApplyConfigDefaults(new[key], value)
-        end
-    end
-    return new
+		elseif typeof(value) == "table" then
+			if typeof(new[key]) ~= "table" then
+				new[key] = {}
+			end
+			new[key] = ApplyConfigDefaults(new[key], value)
+		end
+	end
+	return new
 end
 
 local function OnCharacterAdded(char: Model)
@@ -589,9 +592,9 @@ local function OnCharacterAdded(char: Model)
 
 	Character = char
 	Humanoid = char:WaitForChild("Humanoid")
-    RootPart = char.PrimaryPart or char:FindFirstChildWhichIsA("BasePart")
+	RootPart = char.PrimaryPart or char:FindFirstChildWhichIsA("BasePart")
 
-    Modules.Main_Game = require(PlayerGui:WaitForChild("MainUI").Initiator.Main_Game :: ModuleScript)
+	Modules.Main_Game = require(PlayerGui:WaitForChild("MainUI").Initiator.Main_Game :: ModuleScript)
 end
 
 local function GetRoomAtPoint(vector3: Vector3): Model?
@@ -622,30 +625,30 @@ local function GetRoomAtPoint(vector3: Vector3): Model?
 end
 
 local function FixRoomLights(room: Model)
-    local roomEntrance = room:FindFirstChild("RoomEntrance")
+	local roomEntrance = room:FindFirstChild("RoomEntrance")
 	if not roomEntrance then return end
 
-    for _, c in next, Camera:GetChildren() do
-        if c.Name == "Piece" then
-            c:Destroy()
-        end
-    end
-    
-    Modules.Module_Events.toggle(room, true, Storage.Ambient[room])
+	for _, c in next, Camera:GetChildren() do
+		if c.Name == "Piece" then
+			c:Destroy()
+		end
+	end
 
-    local stuff = {}
-    for _, d in next, room:GetDescendants() do
-        if d:IsA("Model") and (d.Name == "LightStand" or d.Name == "Chandelier") then
-            table.insert(stuff, d)
-        end
-    end
+	Modules.Module_Events.toggle(room, true, Storage.Ambient[room])
 
-    local random = Random.new(tick())
-    for _, v in next, stuff do
-        if v:GetAttribute("Shattered") then
+	local stuff = {}
+	for _, d in next, room:GetDescendants() do
+		if d:IsA("Model") and (d.Name == "LightStand" or d.Name == "Chandelier") then
+			table.insert(stuff, d)
+		end
+	end
+
+	local random = Random.new(tick())
+	for _, v in next, stuff do
+		if v:GetAttribute("Shattered") then
 			local r1 = random:NextInteger(-10, 10) / 50
 			local r2 = random:NextInteger(5, 20) / 100
-	
+
 			task.delay((roomEntrance.Position - v.PrimaryPart.Position).Magnitude / 150 + r1, function()
 				local neon = v:FindFirstChild("Neon", true)
 				for _, d in next, v:GetDescendants() do
@@ -670,7 +673,7 @@ local function FixRoomLights(room: Model)
 				v:SetAttribute("Shattered", nil)
 			end)
 		end
-    end
+	end
 end
 
 local function PlayerHasItemEquipped(name: string): boolean
@@ -691,19 +694,19 @@ local function CrucifixEntity(entity: any)
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = {Character, model}
-	
-    local result = workspace:Raycast(entityPivot.Position, Vector3.new(0, -1000, 0), params)
-    if not result then return end
 
-    model:SetAttribute("BeingBanished", true)
+	local result = workspace:Raycast(entityPivot.Position, Vector3.new(0, -1000, 0), params)
+	if not result then return end
 
-    local MainGame = require(PlayerGui.MainUI.Initiator.Main_Game :: ModuleScript)
-    local CamShaker = MainGame.camShaker
+	model:SetAttribute("BeingBanished", true)
+
+	local MainGame = require(PlayerGui.MainUI.Initiator.Main_Game :: ModuleScript)
+	local CamShaker = MainGame.camShaker
 	local TheShake = CamShaker:StartShake(5, 20, 2, Vector3.zero)
 
 	local Repentance = Assets.Repentance:Clone()
 	local Crucifix = Repentance.Crucifix
-    local Handle = Crucifix.Handle
+	local Handle = Crucifix.Handle
 	local Pentagram = Repentance.Pentagram
 	local EntityPart = Repentance.Entity
 	local Sound = Handle[resist and "SoundFail" or "Sound"]
@@ -714,188 +717,188 @@ local function CrucifixEntity(entity: any)
 	Repentance.Parent = workspace
 	Sound:Play()
 
-    local function waitUntil(t: number)
+	local function waitUntil(t: number)
 		repeat RunService.RenderStepped:Wait() until Sound.TimePosition >= t
 	end
 
 	local function fadeOut()
 		for _, v in Pentagram:GetChildren() do
-            if v.Name == "BeamFlat" then
-                task.delay(v:GetAttribute("Delay") or 0, function()
-                    TweenService:Create(
-                        v,
-                        TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In),
-                        { Brightness = 0 }
-                    ):Play()
-                end)
-            elseif v.Name == "BeamChain" then
-                TweenService:Create(
-                    v,
-                    TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In),
-                    { Brightness = 0 }
-                ):Play()
-            end
-        end
+			if v.Name == "BeamFlat" then
+				task.delay(v:GetAttribute("Delay") or 0, function()
+					TweenService:Create(
+						v,
+						TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In),
+						{ Brightness = 0 }
+					):Play()
+				end)
+			elseif v.Name == "BeamChain" then
+				TweenService:Create(
+					v,
+					TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In),
+					{ Brightness = 0 }
+				):Play()
+			end
+		end
 	end
 
-    local Color = Color3.fromRGB(137, 207, 255)
+	local Color = Color3.fromRGB(137, 207, 255)
 
-    for _, v in next, Repentance:QueryDescendants(".GiveMeColor") do
-        if v:IsA("Light") or v:IsA("BasePart") then
-            v.Color = Color	
-        elseif v:IsA("ParticleEmitter") or v:IsA("Beam") then
-            v.Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Color),
-                ColorSequenceKeypoint.new(1, Color)
-            })
-        end
-    end
+	for _, v in next, Repentance:QueryDescendants(".GiveMeColor") do
+		if v:IsA("Light") or v:IsA("BasePart") then
+			v.Color = Color	
+		elseif v:IsA("ParticleEmitter") or v:IsA("Beam") then
+			v.Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, Color),
+				ColorSequenceKeypoint.new(1, Color)
+			})
+		end
+	end
 
 	task.spawn(function()
-        if not resist then
-            while EntityPart.Parent do
-                model:PivotTo(EntityPart.CFrame)
-                RunService.RenderStepped:Wait()
-            end
-            model:Destroy()
-        end
+		if not resist then
+			while EntityPart.Parent do
+				model:PivotTo(EntityPart.CFrame)
+				RunService.RenderStepped:Wait()
+			end
+			model:Destroy()
+		end
 	end)
 
 	TweenService:Create(
-        Pentagram.Circle,
-        TweenInfo.new(2, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
-        { CFrame = Pentagram.Circle.CFrame - Vector3.new(0, 25, 0) }
-    ):Play()
+		Pentagram.Circle,
+		TweenInfo.new(2, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+		{ CFrame = Pentagram.Circle.CFrame - Vector3.new(0, 25, 0) }
+	):Play()
 
 	task.delay(2, Pentagram.Circle.Destroy, Pentagram.Circle)
 
-    Handle.BodyPosition.Position = (Character:GetPivot() * CFrame.new(1, 4, -6)).Position
+	Handle.BodyPosition.Position = (Character:GetPivot() * CFrame.new(1, 4, -6)).Position
 
 	TweenService:Create(
-        Handle.BodyAngularVelocity,
-        TweenInfo.new(4, Enum.EasingStyle.Cubic, Enum.EasingDirection.In),
-        { AngularVelocity = Vector3.new(0, 40, 0) }
-    ):Play()
+		Handle.BodyAngularVelocity,
+		TweenInfo.new(4, Enum.EasingStyle.Cubic, Enum.EasingDirection.In),
+		{ AngularVelocity = Vector3.new(0, 40, 0) }
+	):Play()
 
-    task.delay(3, function()
-        for _, shard in next, Handle.Shards:GetChildren() do
-            shard.CollisionGroup = "NoPlayer"
-            shard.CanCollide = true
-            shard.Weld:Destroy()
-            shard.AssemblyAngularVelocity = Vector3.zero
-        end
-    end)
+	task.delay(3, function()
+		for _, shard in next, Handle.Shards:GetChildren() do
+			shard.CollisionGroup = "NoPlayer"
+			shard.CanCollide = true
+			shard.Weld:Destroy()
+			shard.AssemblyAngularVelocity = Vector3.zero
+		end
+	end)
 
-    if not resist then
-        TweenService:Create(
-            EntityPart,
-            TweenInfo.new(3, Enum.EasingStyle.Elastic, Enum.EasingDirection.In),
-            { CFrame = EntityPart.CFrame + Vector3.new(0, 2, 0) }
-        ):Play()
-    end
+	if not resist then
+		TweenService:Create(
+			EntityPart,
+			TweenInfo.new(3, Enum.EasingStyle.Elastic, Enum.EasingDirection.In),
+			{ CFrame = EntityPart.CFrame + Vector3.new(0, 2, 0) }
+		):Play()
+	end
 
 	task.spawn(function()
-        waitUntil(2.625)
-		
-        TweenService:Create(
-            Pentagram.Base.LightAttach.LightBright,
-            TweenInfo.new(1.5, Enum.EasingStyle.Circular, Enum.EasingDirection.InOut),
-            { Brightness = 5, Range = 40 }
-        ):Play()
-        TweenService:Create(
-            Handle.Light,
-            TweenInfo.new(1.5, Enum.EasingStyle.Circular, Enum.EasingDirection.InOut),
-            { Brightness = 11.25, Range = 30 }
-        ):Play()
-		
-        task.wait(1.5)
-		
-        TweenService:Create(Pentagram.Base.LightAttach.LightBright, TweenInfo.new(1.5, Enum.EasingStyle.Circular, Enum.EasingDirection.InOut), {
+		waitUntil(2.625)
+
+		TweenService:Create(
+			Pentagram.Base.LightAttach.LightBright,
+			TweenInfo.new(1.5, Enum.EasingStyle.Circular, Enum.EasingDirection.InOut),
+			{ Brightness = 5, Range = 40 }
+		):Play()
+		TweenService:Create(
+			Handle.Light,
+			TweenInfo.new(1.5, Enum.EasingStyle.Circular, Enum.EasingDirection.InOut),
+			{ Brightness = 11.25, Range = 30 }
+		):Play()
+
+		task.wait(1.5)
+
+		TweenService:Create(Pentagram.Base.LightAttach.LightBright, TweenInfo.new(1.5, Enum.EasingStyle.Circular, Enum.EasingDirection.InOut), {
 			Brightness = 0,
 			Range = 0
 		}):Play()
-        TweenService:Create(Handle.Light, TweenInfo.new(1.5, Enum.EasingStyle.Circular, Enum.EasingDirection.InOut), {
+		TweenService:Create(Handle.Light, TweenInfo.new(1.5, Enum.EasingStyle.Circular, Enum.EasingDirection.InOut), {
 			Brightness = 0,
 			Range = 0
 		}):Play()
 
 		if not resist then
-            TweenService:Create(
-                Handle.Light,
-                TweenInfo.new(1, Enum.EasingStyle.Circular, Enum.EasingDirection.InOut),
-                { Brightness = 15, Range = 40 }
-            ):Play()
+			TweenService:Create(
+				Handle.Light,
+				TweenInfo.new(1, Enum.EasingStyle.Circular, Enum.EasingDirection.InOut),
+				{ Brightness = 15, Range = 40 }
+			):Play()
 
-            TheShake:StartFadeOut(3)
-            fadeOut()
+			TheShake:StartFadeOut(3)
+			fadeOut()
 
-            TweenService:Create(
-                Handle.BodyAngularVelocity,
-                TweenInfo.new(3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out),
-                { AngularVelocity = Vector3.zero }
-            ):Play()
-        end
+			TweenService:Create(
+				Handle.BodyAngularVelocity,
+				TweenInfo.new(3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out),
+				{ AngularVelocity = Vector3.zero }
+			):Play()
+		end
 	end)
 
 	if not resist then
 		waitUntil(2.5)
-		
-        TweenService:Create(
-            EntityPart,
-            TweenInfo.new(3, Enum.EasingStyle.Back, Enum.EasingDirection.In),
-            { CFrame = EntityPart.CFrame - Vector3.new(0, 50, 0) }
-        ):Play()
-		
-        for _, s in next, model:QueryDescendants("Sound") do
-            if s:GetAttribute("VolumeIgnore") then continue end
 
-            TweenService:Create(
-                s,
-                TweenInfo.new(3, Enum.EasingStyle.Back, Enum.EasingDirection.In),
-                { Volume = 0 }
-            ):Play()
-        end
+		TweenService:Create(
+			EntityPart,
+			TweenInfo.new(3, Enum.EasingStyle.Back, Enum.EasingDirection.In),
+			{ CFrame = EntityPart.CFrame - Vector3.new(0, 50, 0) }
+		):Play()
 
-        waitUntil(6.75)
+		for _, s in next, model:QueryDescendants("Sound") do
+			if s:GetAttribute("VolumeIgnore") then continue end
+
+			TweenService:Create(
+				s,
+				TweenInfo.new(3, Enum.EasingStyle.Back, Enum.EasingDirection.In),
+				{ Volume = 0 }
+			):Play()
+		end
+
+		waitUntil(6.75)
 	else
 		waitUntil(4)
 
 		TweenService:Create(
-            Handle.BodyAngularVelocity,
-            TweenInfo.new(3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
-            { AngularVelocity = Vector3.zero }
-        ):Play()
+			Handle.BodyAngularVelocity,
+			TweenInfo.new(3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+			{ AngularVelocity = Vector3.zero }
+		):Play()
 		TweenService:Create(
-            Pentagram.Base.LightAttach.LightBright,
-            TweenInfo.new(1.5, Enum.EasingStyle.Circular, Enum.EasingDirection.InOut),
-            { Brightness = 0, Range = 0, Color = Color3.fromRGB(255, 116, 130) }
-        ):Play()
+			Pentagram.Base.LightAttach.LightBright,
+			TweenInfo.new(1.5, Enum.EasingStyle.Circular, Enum.EasingDirection.InOut),
+			{ Brightness = 0, Range = 0, Color = Color3.fromRGB(255, 116, 130) }
+		):Play()
 		TweenService:Create(
-            Handle.Light,
-            TweenInfo.new(1.5, Enum.EasingStyle.Circular, Enum.EasingDirection.InOut),
-            { Brightness = 0, Range = 0, Color = Color3.fromRGB(255, 116, 130) }
-        ):Play()
-		
-        TheShake:StartFadeOut(3)
+			Handle.Light,
+			TweenInfo.new(1.5, Enum.EasingStyle.Circular, Enum.EasingDirection.InOut),
+			{ Brightness = 0, Range = 0, Color = Color3.fromRGB(255, 116, 130) }
+		):Play()
+
+		TheShake:StartFadeOut(3)
 
 		task.spawn(function()
 			local color = Instance.new("Color3Value")
 			color.Value = Color3.fromRGB(137, 207, 255)
 
 			local tween = TweenService:Create(
-                color,
-                TweenInfo.new(0.5, Enum.EasingStyle.Sine),
-                { Value = Color3.fromRGB(255, 116, 130) }
-            )
+				color,
+				TweenInfo.new(0.5, Enum.EasingStyle.Sine),
+				{ Value = Color3.fromRGB(255, 116, 130) }
+			)
 			tween:Play()
 
 			while tween.PlaybackState == Enum.PlaybackState.Playing do
 				for _, d in next, Repentance:GetDescendants() do
 					if d.ClassName == "Beam" then
 						d.Color = ColorSequence.new({
-                            ColorSequenceKeypoint.new(0, color.Value),
-                            ColorSequenceKeypoint.new(1, color.Value)
-                        })
+							ColorSequenceKeypoint.new(0, color.Value),
+							ColorSequenceKeypoint.new(1, color.Value)
+						})
 					elseif d.Name == "Glow" then
 						d.Color = color.Value
 					end
@@ -908,20 +911,20 @@ local function CrucifixEntity(entity: any)
 	end
 
 	TweenService:Create(
-        Handle.Glow,
-        TweenInfo.new(1),
-        { Size = Handle.Glow.Size * 3, Transparency = 1 }
-    ):Play()
+		Handle.Glow,
+		TweenInfo.new(1),
+		{ Size = Handle.Glow.Size * 3, Transparency = 1 }
+	):Play()
 	TweenService:Create(
-        Pentagram.Base.LightAttach.LightBright,
-        TweenInfo.new(1),
-        { Brightness = 0, Range = 0 }
-    ):Play()
+		Pentagram.Base.LightAttach.LightBright,
+		TweenInfo.new(1),
+		{ Brightness = 0, Range = 0 }
+	):Play()
 	TweenService:Create(
-        Handle.Light,
-        TweenInfo.new(1),
-        { Brightness = 0, Range = 0 }
-    ):Play()
+		Handle.Light,
+		TweenInfo.new(1),
+		{ Brightness = 0, Range = 0 }
+	):Play()
 
 	if not resist then
 		Handle.ExplodeParticle:Emit(math.random(20, 30))
@@ -941,52 +944,52 @@ end
 
 local function DamagePlayer(entity: any)
 	if Humanoid.Health <= 0 or IsPlayerProtected() then return end
-		
-    local config = entity.Config
-    local newHealth = math.clamp(Humanoid.Health - config.Damage.Amount, 0, Humanoid.MaxHealth)
 
-    if config.Jumpscare and config.Jumpscare.Enabled then
-        task.spawn(function()
-            PlayJumpscare(config.Jumpscare)
-        end)
-    end
+	local config = entity.Config
+	local newHealth = math.clamp(Humanoid.Health - config.Damage.Amount, 0, Humanoid.MaxHealth)
 
-    Humanoid.Health = newHealth
-    task.spawn(entity.RunCallback, entity, "OnDamagePlayer", newHealth)
+	if config.Jumpscare and config.Jumpscare.Enabled then
+		task.spawn(function()
+			PlayJumpscare(config.Jumpscare)
+		end)
+	end
 
-    if newHealth == 0 then
-        if #config.Death.Hints > 0 then
-            PlayerGui.MainUI.Death:GetPropertyChangedSignal("Visible"):Wait()
+	Humanoid.Health = newHealth
+	task.spawn(entity.RunCallback, entity, "OnDamagePlayer", newHealth)
 
-            local colour;
-            for name, values in next, Storage.DeathTypes do
-                if table.find(values, config.Death.Type:lower()) then
-                    colour = name
-                end
-            end
-            if not colour then
-                for _, c in next, PlayerGui.MainUI.Initiator.Main_Game.Health.Music:GetChildren() do
-                    if c.Name:lower() == config.Death.Type:lower() then
-                        colour = c.Name
-                    end
-                end
-            end
-            if not colour then
-                colour = "Blue"
-            end
-            
-            if firesignal then
-                firesignal(Remotes.DeathHint.OnClientEvent, config.Death.Hints, colour)
-            else
-                warn(debug.traceback("function 'firesignal' not supported by exploit, ignoring death hints"))
-            end
-        end
+	if newHealth == 0 then
+		if #config.Death.Hints > 0 then
+			PlayerGui.MainUI.Death:GetPropertyChangedSignal("Visible"):Wait()
 
-        local cause = config.Death.Cause
-        if typeof(cause) == "string" and cause ~= "" then
-            GameStats["Player_".. LocalPlayer.Name].Total.DeathCause.Value = cause
-        end
-    end
+			local colour;
+			for name, values in next, Storage.DeathTypes do
+				if table.find(values, config.Death.Type:lower()) then
+					colour = name
+				end
+			end
+			if not colour then
+				for _, c in next, PlayerGui.MainUI.Initiator.Main_Game.Health.Music:GetChildren() do
+					if c.Name:lower() == config.Death.Type:lower() then
+						colour = c.Name
+					end
+				end
+			end
+			if not colour then
+				colour = "Blue"
+			end
+
+			if firesignal then
+				firesignal(Remotes.DeathHint.OnClientEvent, config.Death.Hints, colour)
+			else
+				warn(debug.traceback("function 'firesignal' not supported by exploit, ignoring death hints"))
+			end
+		end
+
+		local cause = config.Death.Cause
+		if typeof(cause) == "string" and cause ~= "" then
+			GameStats["Player_".. LocalPlayer.Name].Total.DeathCause.Value = cause
+		end
+	end
 end
 
 local function GetNodesFromRoom(room: Model, reversed: boolean, config: any?): { BasePart }
@@ -1029,94 +1032,94 @@ end
 
 local function GetPathfindNodesAmbush(config: any): { BasePart }
 	local pathfindNodes = {}
-    local rooms = GetSortedRooms()
-    local latestRoom = GetCurrentRoom(true)
+	local rooms = GetSortedRooms()
+	local latestRoom = GetCurrentRoom(true)
 
-    if config.Movement.Reversed == false then
-        for _, room in ipairs(rooms) do
-            if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
-                break
-            end
+	if config.Movement.Reversed == false then
+		for _, room in ipairs(rooms) do
+			if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
+				break
+			end
 
-            local roomNodes = GetNodesFromRoom(room, false, config)
-            for _, node in ipairs(roomNodes) do
-                pathfindNodes[#pathfindNodes + 1] = node
-            end
-        end
-    else
-        for i = #rooms, 1, -1 do
-            local room = rooms[i]
-            if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
-                continue
-            end
+			local roomNodes = GetNodesFromRoom(room, false, config)
+			for _, node in ipairs(roomNodes) do
+				pathfindNodes[#pathfindNodes + 1] = node
+			end
+		end
+	else
+		for i = #rooms, 1, -1 do
+			local room = rooms[i]
+			if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
+				continue
+			end
 
-            local roomNodes = GetNodesFromRoom(room, true, config)
-            for _, node in ipairs(roomNodes) do
-                pathfindNodes[#pathfindNodes + 1] = node
-            end
-        end
-    end
+			local roomNodes = GetNodesFromRoom(room, true, config)
+			for _, node in ipairs(roomNodes) do
+				pathfindNodes[#pathfindNodes + 1] = node
+			end
+		end
+	end
 	return pathfindNodes
 end
 
 local function GetPathfindNodesBlitz(config: any): ({BasePart}, {BasePart})
 	local nodesToCurrent, nodesToEnd = {}, {}
 	local currentRoomIndex = LocalPlayer:GetAttribute("CurrentRoom") or 0
-    local rooms = GetSortedRooms()
-    local latestRoom = GetCurrentRoom(true)
+	local rooms = GetSortedRooms()
+	local latestRoom = GetCurrentRoom(true)
 
-    if config.Movement.Reversed == false then
-        for _, room in ipairs(rooms) do
-            if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
-                break
-            end
+	if config.Movement.Reversed == false then
+		for _, room in ipairs(rooms) do
+			if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
+				break
+			end
 
-            local roomNodes = GetNodesFromRoom(room, false, config)
-            local roomIndex = tonumber(room.Name) or 0
-    
-            for _, node in ipairs(roomNodes) do
-                if roomIndex <= currentRoomIndex then
-                    nodesToCurrent[#nodesToCurrent + 1] = node
-                else
-                    nodesToEnd[#nodesToEnd + 1] = node
-                end
-            end
-        end
-    else
-        for i = #rooms, 1, -1 do
-            local room = rooms[i]
-            if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
-                continue
-            end
+			local roomNodes = GetNodesFromRoom(room, false, config)
+			local roomIndex = tonumber(room.Name) or 0
 
-            local roomNodes = GetNodesFromRoom(room, true, config)
-            local roomIndex = tonumber(room.Name) or 0
-    
-            for _, node in ipairs(roomNodes) do
-                if roomIndex >= currentRoomIndex then
-                    nodesToCurrent[#nodesToCurrent + 1] = node
-                else
-                    nodesToEnd[#nodesToEnd + 1] = node
-                end
-            end
-        end 
-    end
+			for _, node in ipairs(roomNodes) do
+				if roomIndex <= currentRoomIndex then
+					nodesToCurrent[#nodesToCurrent + 1] = node
+				else
+					nodesToEnd[#nodesToEnd + 1] = node
+				end
+			end
+		end
+	else
+		for i = #rooms, 1, -1 do
+			local room = rooms[i]
+			if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
+				continue
+			end
+
+			local roomNodes = GetNodesFromRoom(room, true, config)
+			local roomIndex = tonumber(room.Name) or 0
+
+			for _, node in ipairs(roomNodes) do
+				if roomIndex >= currentRoomIndex then
+					nodesToCurrent[#nodesToCurrent + 1] = node
+				else
+					nodesToEnd[#nodesToEnd + 1] = node
+				end
+			end
+		end 
+	end
 
 	return nodesToCurrent, nodesToEnd
 end
 
 local function GetCurrentSpeed(model: Model, config: any): number
-    if config.Movement and config.Movement.MoveFastNotEnter then
-        local latestRoom = GetCurrentRoom(true)
-        if latestRoom then
-            local latestNum = tonumber(latestRoom.Name) or 0
-            local currentNum = model:GetAttribute("LastEnteredRoom") or -1
-            if currentNum < latestNum then
-                return config.Movement.SpeedFast or (CONST.BASE_ENTITY_SPEED / 100 * 370)
-            end
-        end
-    end
-    return config.Movement.Speed or CONST.BASE_ENTITY_SPEED
+	if config.Movement and config.Movement.MoveFastNotEnter then
+		local latestRoom = GetCurrentRoom(true)
+		if latestRoom then
+			local latestNum = tonumber(latestRoom.Name) or 0
+			local currentNum = model:GetAttribute("LastEnteredRoom") or -1
+			if currentNum < latestNum then
+				return config.Movement.SpeedFast or (CONST.BASE_ENTITY_SPEED / 100 * 370)
+			end
+		end
+	end
+	return config.Movement.Speed or CONST.BASE_ENTITY_SPEED
 end
 
 local function EntityMoveToSpeed(model: Model, cframe: CFrame, speedInput: any)
@@ -1149,66 +1152,66 @@ local function EntityMoveToSpeed(model: Model, cframe: CFrame, speedInput: any)
 end
 
 local function EntityMoveToTween(model: Model, targetCFrame: CFrame, duration: number)
-    if not model or not model.Parent then return end
-    local startPivot = model:GetPivot()
-    local elapsed = 0
-    local connection
-    local reached = false
+	if not model or not model.Parent then return end
+	local startPivot = model:GetPivot()
+	local elapsed = 0
+	local connection
+	local reached = false
 
-    connection = RunService.Stepped:Connect(function(_, step)
-        if not model or not model.Parent then
-            if connection then connection:Disconnect() end
-            reached = true
-            return
-        end
+	connection = RunService.Stepped:Connect(function(_, step)
+		if not model or not model.Parent then
+			if connection then connection:Disconnect() end
+			reached = true
+			return
+		end
 
-        if not model:GetAttribute("Paused") then
-            elapsed = elapsed + step
-            local alpha = math.clamp(elapsed / math.max(duration, 0.01), 0, 1)
-            local quadAlpha = TweenService:GetValue(alpha, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
-            model:PivotTo(startPivot:Lerp(targetCFrame, quadAlpha))
+		if not model:GetAttribute("Paused") then
+			elapsed = elapsed + step
+			local alpha = math.clamp(elapsed / math.max(duration, 0.01), 0, 1)
+			local quadAlpha = TweenService:GetValue(alpha, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+			model:PivotTo(startPivot:Lerp(targetCFrame, quadAlpha))
 
-            if alpha >= 1 then
-                connection:Disconnect()
-                reached = true
-            end
-        end
-    end)
+			if alpha >= 1 then
+				connection:Disconnect()
+				reached = true
+			end
+		end
+	end)
 
-    repeat RunService.Stepped:Wait() until reached or not model or not model.Parent
+	repeat RunService.Stepped:Wait() until reached or not model or not model.Parent
 end
 
 local function EntityMoveTo(model: Model, cframe: CFrame, config: any)
-    if config.Movement and config.Movement.ReboundMoving then
-        EntityMoveToTween(model, cframe, config.Movement.TweenSecond or 1)
-    else
-        EntityMoveToSpeed(model, cframe, function()
-            return GetCurrentSpeed(model, config)
-        end)
-    end
+	if config.Movement and config.Movement.ReboundMoving then
+		EntityMoveToTween(model, cframe, config.Movement.TweenSecond or 1)
+	else
+		EntityMoveToSpeed(model, cframe, function()
+			return GetCurrentSpeed(model, config)
+		end)
+	end
 end
 
 local function Earthquake()
-    Modules.Main_Game.camShaker:ShakeOnce(4, 12, 1, 5)
-    Modules.Main_Game.camShaker:ShakeOnce(10, 2, 3, 3)
-    Assets.Earthquake.SoundEarthquake:Play()
-    local v5 = CollectionService:GetTagged("PartCeiling")
-    local v6 = {}
-    for _, v7 in v5 do
-        local v8 = v7.Size.Magnitude * 0.7
-        local v9 = math.clamp(v8, 0, 150)
-        for _, v10 in Assets.Earthquake.Particles:GetChildren() do
-            local v11 = v10:Clone()
-            v11.Parent = v7
-            v11:Emit(v9 / 10)
-            v11.Enabled = true
-            table.insert(v6, v11)
-        end
-    end
-    task.wait(4)
-    for _, v12 in v6 do
-        v12.Enabled = false
-    end
+	Modules.Main_Game.camShaker:ShakeOnce(4, 12, 1, 5)
+	Modules.Main_Game.camShaker:ShakeOnce(10, 2, 3, 3)
+	Assets.Earthquake.SoundEarthquake:Play()
+	local v5 = CollectionService:GetTagged("PartCeiling")
+	local v6 = {}
+	for _, v7 in v5 do
+		local v8 = v7.Size.Magnitude * 0.7
+		local v9 = math.clamp(v8, 0, 150)
+		for _, v10 in Assets.Earthquake.Particles:GetChildren() do
+			local v11 = v10:Clone()
+			v11.Parent = v7
+			v11:Emit(v9 / 10)
+			v11.Enabled = true
+			table.insert(v6, v11)
+		end
+	end
+	task.wait(4)
+	for _, v12 in v6 do
+		v12.Enabled = false
+	end
 end
 
 -- \\ Setup // --
@@ -1224,567 +1227,567 @@ LocalPlayer.CharacterAdded:Connect(OnCharacterAdded)
 -- \\ Main // --
 
 Module.Create = function(self, config: any): any?
-    local newConfig = ApplyConfigDefaults(config, CONST.DEFAULT.CONFIG)
-    newConfig.Movement.Speed = CONST.BASE_ENTITY_SPEED / 100 * config.Movement.Speed
-    if config.Movement and config.Movement.SpeedFast then
-        newConfig.Movement.SpeedFast = CONST.BASE_ENTITY_SPEED / 100 * config.Movement.SpeedFast
-    end
+	local newConfig = ApplyConfigDefaults(config, CONST.DEFAULT.CONFIG)
+	newConfig.Movement.Speed = CONST.BASE_ENTITY_SPEED / 100 * config.Movement.Speed
+	if config.Movement and config.Movement.SpeedFast then
+		newConfig.Movement.SpeedFast = CONST.BASE_ENTITY_SPEED / 100 * config.Movement.SpeedFast
+	end
 
-    local asset = newConfig.Entity.Asset
-    local success, entityModel = false, nil
+	local asset = newConfig.Entity.Asset
+	local success, entityModel = false, nil
 
-    if typeof(asset) == "Instance" then
-        success, entityModel = true, asset
-    elseif typeof(asset) == "string" then
-        success, entityModel = pcall(function()
+	if typeof(asset) == "Instance" then
+		success, entityModel = true, asset
+	elseif typeof(asset) == "string" then
+		success, entityModel = pcall(function()
 			local instance: Instance? = LoadCustomInstance(asset)
 			if typeof(instance) == "Instance" then
-                if instance.ClassName ~= "Model" then
-                    error(string.format(
-                        debug.traceback("Entity model Instance invalid, expected Model but got '%s'"),
-                        instance.ClassName
-                    ))
-                    return
-                end
+				if instance.ClassName ~= "Model" then
+					error(string.format(
+						debug.traceback("Entity model Instance invalid, expected Model but got '%s'"),
+						instance.ClassName
+						))
+					return
+				end
 			else
 				error(debug.traceback("Failed to fetch entity model."))
 				return
 			end
 			return instance
 		end)
-    end
-    if not (success and entityModel) then return end
+	end
+	if not (success and entityModel) then return end
 
-    local rootPart = entityModel.PrimaryPart or entityModel:FindFirstChildWhichIsA("BasePart", true)
-    if not rootPart then return end
+	local rootPart = entityModel.PrimaryPart or entityModel:FindFirstChildWhichIsA("BasePart", true)
+	if not rootPart then return end
 
-    rootPart.Anchored = true
-    entityModel.PrimaryPart = rootPart
+	rootPart.Anchored = true
+	entityModel.PrimaryPart = rootPart
 
-    local name = config.Entity.Name
-    if typeof(name) == "string" and name ~= "" then
-        entityModel.Name = name
-    end
+	local name = config.Entity.Name
+	if typeof(name) == "string" and name ~= "" then
+		entityModel.Name = name
+	end
 
-    for attr, val in next, CONST.ATTR.ENTITY do
-        entityModel:SetAttribute(attr, val)
-    end
+	for attr, val in next, CONST.ATTR.ENTITY do
+		entityModel:SetAttribute(attr, val)
+	end
 
-    local c = Instance.new("Configuration")
-    c.Name = "RoomsEntered"
-    c.Parent = entityModel
+	local c = Instance.new("Configuration")
+	c.Name = "RoomsEntered"
+	c.Parent = entityModel
 
-    return {
-        Model = entityModel,
-        Config = newConfig,
-        Debug = CloneTable(CONST.DEFAULT.DEBUG),
-        SetCallback = function(self, key: string, callback: any)
-            assert(typeof(key) == "string", debug.traceback("Callback key must be a string."))
-            assert(typeof(callback) == "function", debug.traceback("Callback must be a function."))
-            self.Debug[key] = callback
-        end,
-        RunCallback = function(self, key: string, ...: any?)
-            local callback = self.Debug[key]
-            if typeof(callback) == "function" then
-                local success, result = pcall(callback, ...)
-                if not success then
-                    error(debug.traceback(
-                        string.format(
-                            "Error in callback: '%s' for entity: '%s':\n%s",
-                            key,
-                            self.Config.Entity.Name,
-                            result
-                        )
-                    ))
-                end
-            end
-        end,
-        IsAlive = function(self): boolean
-            return self.Model and self.Model.Parent
-        end,
-        Pause = function(self)
-            if self:IsAlive() then
-                self.Model:SetAttribute("Paused", true)
-            end
-        end,
-        Resume = function(self)
-            if self:IsAlive() then
-                self.Model:SetAttribute("Paused", false)
-            end
-        end,
-        Run = function(self, copyEntity: boolean)
-            Module:Run(self, copyEntity)
-        end,
-        Despawn = function(self)
-            if self:IsAlive() then
-                self.Model:Destroy()
-                local i = table.find(Module.ActiveEntities, self)
-                if i then
-                    table.remove(Module.ActiveEntities, i)
-                end
-                task.spawn(self.RunCallback, self, "OnDespawned")
-            end
-        end
-    }
+	return {
+		Model = entityModel,
+		Config = newConfig,
+		Debug = CloneTable(CONST.DEFAULT.DEBUG),
+		SetCallback = function(self, key: string, callback: any)
+			assert(typeof(key) == "string", debug.traceback("Callback key must be a string."))
+			assert(typeof(callback) == "function", debug.traceback("Callback must be a function."))
+			self.Debug[key] = callback
+		end,
+		RunCallback = function(self, key: string, ...: any?)
+			local callback = self.Debug[key]
+			if typeof(callback) == "function" then
+				local success, result = pcall(callback, ...)
+				if not success then
+					error(debug.traceback(
+						string.format(
+							"Error in callback: '%s' for entity: '%s':\n%s",
+							key,
+							self.Config.Entity.Name,
+							result
+						)
+						))
+				end
+			end
+		end,
+		IsAlive = function(self): boolean
+			return self.Model and self.Model.Parent
+		end,
+		Pause = function(self)
+			if self:IsAlive() then
+				self.Model:SetAttribute("Paused", true)
+			end
+		end,
+		Resume = function(self)
+			if self:IsAlive() then
+				self.Model:SetAttribute("Paused", false)
+			end
+		end,
+		Run = function(self, copyEntity: boolean)
+			Module:Run(self, copyEntity)
+		end,
+		Despawn = function(self)
+			if self:IsAlive() then
+				self.Model:Destroy()
+				local i = table.find(Module.ActiveEntities, self)
+				if i then
+					table.remove(Module.ActiveEntities, i)
+				end
+				task.spawn(self.RunCallback, self, "OnDespawned")
+			end
+		end
+	}
 end
 
 Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: boolean?)
-    if copyEntity == true then
-        self:Run(CloneTable(entity), false, isReboundRespawn)
-        return
-    end
+	if copyEntity == true then
+		self:Run(CloneTable(entity), false, isReboundRespawn)
+		return
+	end
 
-    if entity.Model:GetAttribute("Running") then return end
-    do
-        local rebounding = entity.Config.Rebounding
-        if
-            rebounding.Enabled
-            and (
-                rebounding.Min <= 0
-                or rebounding.Max <= 0
-                or rebounding.Min > rebounding.Max
-            )
-        then
-            error(string.format(
-                debug.traceback("Invalid rebounding minmax values: %s - %s"),
-                rebounding.Min,
-                rebounding.Max
-            ))
-        end
-    end
+	if entity.Model:GetAttribute("Running") then return end
+	do
+		local rebounding = entity.Config.Rebounding
+		if
+			rebounding.Enabled
+			and (
+				rebounding.Min <= 0
+					or rebounding.Max <= 0
+					or rebounding.Min > rebounding.Max
+			)
+		then
+			error(string.format(
+				debug.traceback("Invalid rebounding minmax values: %s - %s"),
+				rebounding.Min,
+				rebounding.Max
+				))
+		end
+	end
 
-    local model = entity.Model
-    local config = entity.Config
-    local debug = entity.Debug
+	local model = entity.Model
+	local config = entity.Config
+	local debug = entity.Debug
 
-    model:SetAttribute("Running", true)
-    self.ActiveEntities[#self.ActiveEntities + 1] = entity
+	model:SetAttribute("Running", true)
+	self.ActiveEntities[#self.ActiveEntities + 1] = entity
 
-    if config.Movement.ReboundMoveStyle and not isReboundRespawn and not model:GetAttribute("ReboundStyleStarted") then
-        model:SetAttribute("ReboundStyleStarted", true)
-        
-        task.spawn(function()
-            local times = math.clamp(tonumber(config.Movement.ReboundStyleTimes) or 1, 1, 7)
-            local soundId = config.Movement.ReboundStyleSound
-            local volume = config.Movement.ReboundStyleVolume or 1
-            local spawnedCount = 0
+	if config.Movement.ReboundMoveStyle and not isReboundRespawn and not model:GetAttribute("ReboundStyleStarted") then
+		model:SetAttribute("ReboundStyleStarted", true)
 
-            local connection
-            connection = CurrentRooms.ChildAdded:Connect(function(newRoom)
-                if spawnedCount >= times then
-                    if connection then connection:Disconnect() end
-                    return
-                end
+		task.spawn(function()
+			local times = math.clamp(tonumber(config.Movement.ReboundStyleTimes) or 1, 1, 7)
+			local soundId = config.Movement.ReboundStyleSound
+			local volume = config.Movement.ReboundStyleVolume or 1
+			local spawnedCount = 0
 
-                spawnedCount = spawnedCount + 1
+			local connection
+			connection = CurrentRooms.ChildAdded:Connect(function(newRoom)
+				if spawnedCount >= times then
+					if connection then connection:Disconnect() end
+					return
+				end
 
-                if soundId and soundId ~= "" and soundId ~= "rbxassetid://" and soundId ~= "rbxassetid://0" then
-                    local sound = Instance.new("Sound")
-                    sound.SoundId = soundId
-                    sound.Volume = volume
-                    sound.Parent = workspace
-                    sound:Play()
-                    Debris:AddItem(sound, 5)
-                end
+				spawnedCount = spawnedCount + 1
 
-                task.delay(0.2, function()
-                    local newEntity = Module:Create(config)
-                    if newEntity then
-                        newEntity.Debug = CloneTable(entity.Debug)
-                        Module:Run(newEntity, false, true)
-                    end
-                end)
-            end)
-        end)
-    end
+				if soundId and soundId ~= "" and soundId ~= "rbxassetid://" and soundId ~= "rbxassetid://0" then
+					local sound = Instance.new("Sound")
+					sound.SoundId = soundId
+					sound.Volume = volume
+					sound.Parent = workspace
+					sound:Play()
+					Debris:AddItem(sound, 5)
+				end
 
-    local spawnPoint: BasePart? = nil
-    do
-        local rooms = GetSortedRooms()
-        local latestRoom = GetCurrentRoom(true)
-        if config.Movement.Reversed then
-            local targetRoom = rooms[#rooms]
-            if config.Movement.EndWhenEnterLatestRoom and targetRoom == latestRoom and #rooms > 1 then
-                targetRoom = rooms[#rooms - 1]
-            end
-            spawnPoint = targetRoom:FindFirstChild("RoomExit") or targetRoom:FindFirstChild("RoomEntrance")
-        else
-            spawnPoint = rooms[1]:FindFirstChild("RoomEntrance")
-        end
-    end
-    if not spawnPoint then
-        error(string.format(debug.traceback("Failed to find spawn point for entity: '%s'"), config.Entity.Name))
-    end
+				task.delay(0.2, function()
+					local newEntity = Module:Create(config)
+					if newEntity then
+						newEntity.Debug = CloneTable(entity.Debug)
+						Module:Run(newEntity, false, true)
+					end
+				end)
+			end)
+		end)
+	end
 
-    model:PivotTo(spawnPoint.CFrame + Vector3.new(0, config.Entity.HeightOffset, 0))
-    model.Parent = workspace
-    task.spawn(entity.RunCallback, entity, "OnSpawned")
+	local spawnPoint: BasePart? = nil
+	do
+		local rooms = GetSortedRooms()
+		local latestRoom = GetCurrentRoom(true)
+		if config.Movement.Reversed then
+			local targetRoom = rooms[#rooms]
+			if config.Movement.EndWhenEnterLatestRoom and targetRoom == latestRoom and #rooms > 1 then
+				targetRoom = rooms[#rooms - 1]
+			end
+			spawnPoint = targetRoom:FindFirstChild("RoomExit") or targetRoom:FindFirstChild("RoomEntrance")
+		else
+			spawnPoint = rooms[1]:FindFirstChild("RoomEntrance")
+		end
+	end
+	if not spawnPoint then
+		error(string.format(debug.traceback("Failed to find spawn point for entity: '%s'"), config.Entity.Name))
+	end
 
-    if not isReboundRespawn and config.Spawned and config.Spawned.ChangeColorWhenSpawn then
-        task.spawn(function()
-            local colorCorrection = Lighting:FindFirstChild("MainColorCorrection")
-            if not colorCorrection then
-                colorCorrection = Instance.new("ColorCorrectionEffect")
-                colorCorrection.Name = "MainColorCorrection"
-                colorCorrection.Parent = Lighting
-            end
+	model:PivotTo(spawnPoint.CFrame + Vector3.new(0, config.Entity.HeightOffset, 0))
+	model.Parent = workspace
+	task.spawn(entity.RunCallback, entity, "OnSpawned")
 
-            if config.Spawned.Rainbow then
-                colorCorrection.TintColor = Color3.fromRGB(255, 255, 255)
-                colorCorrection.Contrast = 0.1
+	if not isReboundRespawn and config.Spawned and config.Spawned.ChangeColorWhenSpawn then
+		task.spawn(function()
+			local colorCorrection = Lighting:FindFirstChild("MainColorCorrection")
+			if not colorCorrection then
+				colorCorrection = Instance.new("ColorCorrectionEffect")
+				colorCorrection.Name = "MainColorCorrection"
+				colorCorrection.Parent = Lighting
+			end
 
-                TweenService:Create(colorCorrection, TweenInfo.new(2.5), {Contrast = 0}):Play()
+			if config.Spawned.Rainbow then
+				colorCorrection.TintColor = Color3.fromRGB(255, 255, 255)
+				colorCorrection.Contrast = 0.1
 
-                local redTween = TweenService:Create(colorCorrection, TweenInfo.new(5), {TintColor = Color3.fromRGB(250, 0, 0)})
-                redTween:Play()
+				TweenService:Create(colorCorrection, TweenInfo.new(2.5), {Contrast = 0}):Play()
 
-                task.wait(0.5)
+				local redTween = TweenService:Create(colorCorrection, TweenInfo.new(5), {TintColor = Color3.fromRGB(250, 0, 0)})
+				redTween:Play()
 
-                local colors = {
-                    Color3.fromRGB(255, 255, 0),  
-                    Color3.fromRGB(0, 0, 255),    
-                    Color3.fromRGB(0, 255, 0),   
-                    Color3.fromRGB(255, 105, 180)  
-                }
+				task.wait(0.5)
 
-                for _ = 1, 2 do
-                    for _, color in ipairs(colors) do
-                        local tween = TweenService:Create(colorCorrection, TweenInfo.new(0.35), {TintColor = color})
-                        tween:Play()
-                        task.wait(0.25)
-                    end
-                end  
+				local colors = {
+					Color3.fromRGB(255, 255, 0),  
+					Color3.fromRGB(0, 0, 255),    
+					Color3.fromRGB(0, 255, 0),   
+					Color3.fromRGB(255, 105, 180)  
+				}
 
-                local finalRed = TweenService:Create(colorCorrection, TweenInfo.new(1), {TintColor = Color3.fromRGB(255, 255, 255)})
-                finalRed:Play()
-            else
-                colorCorrection.TintColor = config.Spawned.Color
-                colorCorrection.Contrast = 1
-                TweenService:Create(colorCorrection, TweenInfo.new(0.5), {Contrast = 0}):Play()
-                local TW = TweenService:Create(colorCorrection, TweenInfo.new(5), {TintColor = Color3.fromRGB(255, 255, 255)})
-                TW:Play()
-            end
-        end)
-    end
+				for _ = 1, 2 do
+					for _, color in ipairs(colors) do
+						local tween = TweenService:Create(colorCorrection, TweenInfo.new(0.35), {TintColor = color})
+						tween:Play()
+						task.wait(0.25)
+					end
+				end  
 
-    local currentRoom = GetCurrentRoom(false)
-    if not isReboundRespawn and currentRoom then
-        if config.Lights.Flicker.Enabled then
-            Modules.Module_Events.flicker(currentRoom, config.Lights.Flicker.Duration)
-        end
+				local finalRed = TweenService:Create(colorCorrection, TweenInfo.new(1), {TintColor = Color3.fromRGB(255, 255, 255)})
+				finalRed:Play()
+			else
+				colorCorrection.TintColor = config.Spawned.Color
+				colorCorrection.Contrast = 1
+				TweenService:Create(colorCorrection, TweenInfo.new(0.5), {Contrast = 0}):Play()
+				local TW = TweenService:Create(colorCorrection, TweenInfo.new(5), {TintColor = Color3.fromRGB(255, 255, 255)})
+				TW:Play()
+			end
+		end)
+	end
 
-        if config.Earthquake.Enabled then
-            task.spawn(Earthquake)
-        end
-    end
-    
-    task.wait(config.Movement.Delay)
+	local currentRoom = GetCurrentRoom(false)
+	if not isReboundRespawn and currentRoom then
+		if config.Lights.Flicker.Enabled then
+			Modules.Module_Events.flicker(currentRoom, config.Lights.Flicker.Duration)
+		end
 
-    task.spawn(entity.RunCallback, entity, "OnStartMoving")
-    task.spawn(function()
-        while
-            entity:IsAlive()
-            and task.wait()
-        do
-            if model:GetAttribute("Paused") then continue end
-            
-            local origin = model:GetPivot().Position
-            local charOrigin = RootPart.Position
-            
-            local inSight = false
-            if (charOrigin - origin).Magnitude <= config.Damage.Range then
-                local params = RaycastParams.new()
-                params.FilterType = Enum.RaycastFilterType.Exclude
-                params.FilterDescendantsInstances = {Character, model, CollectionService:GetTagged("HidingSpot")}
+		if config.Earthquake.Enabled then
+			task.spawn(Earthquake)
+		end
+	end
 
-                inSight = workspace:Raycast(origin, charOrigin - origin, params) == nil
-            end
+	task.wait(config.Movement.Delay)
 
-            if Humanoid.Health > 0 then
-                local _, isVisible = Camera:WorldToViewportPoint(origin)
-                if isVisible then
-                    task.spawn(entity.RunCallback, entity, "OnLookAt", inSight)
-                end
-            end
+	task.spawn(entity.RunCallback, entity, "OnStartMoving")
+	task.spawn(function()
+		while
+			entity:IsAlive()
+			and task.wait()
+		do
+			if model:GetAttribute("Paused") then continue end
 
-            do
-                local room = GetRoomAtPoint(origin)
-                if room then
-                    local index = tonumber(room.Name)
-                    if
-                        index
-                        and index >= 0
-                        and index ~= model:GetAttribute("LastEnteredRoom")
-                    then
-                        model:SetAttribute("LastEnteredRoom", index)
+			local origin = model:GetPivot().Position
+			local charOrigin = RootPart.Position
 
-                        local roomsEntered = model:FindFirstChild("RoomsEntered") :: Folder
-                        if roomsEntered then
-                            local firstTime = roomsEntered:GetAttribute(room.Name) == nil
-                            
-                            task.spawn(entity.RunCallback, entity, "OnEnterRoom", room, firstTime)
+			local inSight = false
+			if (charOrigin - origin).Magnitude <= config.Damage.Range then
+				local params = RaycastParams.new()
+				params.FilterType = Enum.RaycastFilterType.Exclude
+				params.FilterDescendantsInstances = {Character, model, CollectionService:GetTagged("HidingSpot")}
 
-                            if firstTime then
-                                roomsEntered:SetAttribute(room.Name, true)
-                            end
-                            
-                            local latestRoom = GetCurrentRoom(true)
-                            if room ~= latestRoom then
-                                if config.Lights.Shatter then
-                                    Modules.Module_Events.shatter(room)
-                                elseif config.Lights.Repair then
-                                    FixRoomLights(room)
-                                end
-                            end
-                        end
-                    end
-                end
-            end
+				inSight = workspace:Raycast(origin, charOrigin - origin, params) == nil
+			end
 
-            local usedCrucifix = false
-            do
-                local crucifixion = config.Crucifixion
-                if
-                    crucifixion.Enabled
-                    and crucifixion.Range > 0
-                    and (charOrigin - origin).Magnitude <= crucifixion.Range
-                    and inSight
-                then
-                    local hasTool, tool = PlayerHasItemEquipped("Crucifix")
-                    if hasTool and tool and not model:GetAttribute("BeingBanished") then
-                        if typeof(debug.CrucifixionOverwrite) == "function" then
-                            entity:RunCallback("CrucifixionOverwrite")
-                        else
-                            tool:Destroy()
-                            model:SetAttribute("Paused", true)
-                            CrucifixEntity(entity)
-                        end
-                        usedCrucifix = true
-                    end
-                end
-            end
+			if Humanoid.Health > 0 then
+				local _, isVisible = Camera:WorldToViewportPoint(origin)
+				if isVisible then
+					task.spawn(entity.RunCallback, entity, "OnLookAt", inSight)
+				end
+			end
 
-            if
-                not model:GetAttribute("Paused")
-                and not usedCrucifix
-            then
-                local damage = config.Damage
-                local ripper = damage.JumpscareRipper
+			do
+				local room = GetRoomAtPoint(origin)
+				if room then
+					local index = tonumber(room.Name)
+					if
+						index
+						and index >= 0
+						and index ~= model:GetAttribute("LastEnteredRoom")
+					then
+						model:SetAttribute("LastEnteredRoom", index)
 
-                if
-                    damage.Enabled == true
-                    and damage.Range > 0
-                    and Humanoid.Health > 0
-                    and (not Character:GetAttribute("Hiding") or damage.IgnoreHiding)
-                    and model:GetAttribute("Damage")
-                    and not model:GetAttribute("BeingBanished")
-                    and (charOrigin - origin).Magnitude <= damage.Range
-                    and inSight
-                then
-                    local isMoving = (Humanoid.MoveDirection.Magnitude > 0) or ((RootPart.AssemblyLinearVelocity * Vector3.new(1, 0, 1)).Magnitude > 0.5)
-                    local shouldDamage = true
+						local roomsEntered = model:FindFirstChild("RoomsEntered") :: Folder
+						if roomsEntered then
+							local firstTime = roomsEntered:GetAttribute(room.Name) == nil
 
-                    if damage.KillOnMove then
-                        if not isMoving then
-                            shouldDamage = false
-                        end
-                    end
+							task.spawn(entity.RunCallback, entity, "OnEnterRoom", room, firstTime)
 
-                    if shouldDamage then
-                        model:SetAttribute("Damage", false)
+							if firstTime then
+								roomsEntered:SetAttribute(room.Name, true)
+							end
 
-                        if ripper and ripper.Enabled == true then
-                            PlayRipperJumpscare(entity)
-                        else
-                            DamagePlayer(entity)
-                        end
-                    end
-                end
-            end
+							local latestRoom = GetCurrentRoom(true)
+							if room ~= latestRoom then
+								if config.Lights.Shatter then
+									Modules.Module_Events.shatter(room)
+								elseif config.Lights.Repair then
+									FixRoomLights(room)
+								end
+							end
+						end
+					end
+				end
+			end
 
-            do
-                local camShake = config.CameraShake
-                if camShake.Enabled then
-                    local mag = (charOrigin - origin).Magnitude
-                    if mag <= camShake.Range then
-                        local cloned = {}
-                        for i, v in next, camShake.Values do
-                            cloned[i] = v
-                        end
+			local usedCrucifix = false
+			do
+				local crucifixion = config.Crucifixion
+				if
+					crucifixion.Enabled
+					and crucifixion.Range > 0
+					and (charOrigin - origin).Magnitude <= crucifixion.Range
+					and inSight
+				then
+					local hasTool, tool = PlayerHasItemEquipped("Crucifix")
+					if hasTool and tool and not model:GetAttribute("BeingBanished") then
+						if typeof(debug.CrucifixionOverwrite) == "function" then
+							entity:RunCallback("CrucifixionOverwrite")
+						else
+							tool:Destroy()
+							model:SetAttribute("Paused", true)
+							CrucifixEntity(entity)
+						end
+						usedCrucifix = true
+					end
+				end
+			end
 
-                        cloned[1] = camShake.Values[1] / camShake.Range * (camShake.Range - mag)
-                        cloned[2] = camShake.Values[2] / camShake.Range * (camShake.Range - mag)
-                        Modules.Main_Game.camShaker:ShakeOnce(table.unpack(cloned))
-                    end
-                end
-            end
-        end
-    end)
+			if
+				not model:GetAttribute("Paused")
+				and not usedCrucifix
+			then
+				local damage = config.Damage
+				local ripper = damage.JumpscareRipper
 
-    task.spawn(function()
-        local reboundType = config.Rebounding.Type:upper()
-        if reboundType == "AMBUSH" then
-            local pathfindNodes = GetPathfindNodesAmbush(config)
+				if
+					damage.Enabled == true
+					and damage.Range > 0
+					and Humanoid.Health > 0
+					and (not Character:GetAttribute("Hiding") or damage.IgnoreHiding)
+					and model:GetAttribute("Damage")
+					and not model:GetAttribute("BeingBanished")
+					and (charOrigin - origin).Magnitude <= damage.Range
+					and inSight
+				then
+					local isMoving = (Humanoid.MoveDirection.Magnitude > 0) or ((RootPart.AssemblyLinearVelocity * Vector3.new(1, 0, 1)).Magnitude > 0.5)
+					local shouldDamage = true
 
-            local roomAddedConn
-            roomAddedConn = CurrentRooms.ChildAdded:Connect(function(newRoom)
-                task.spawn(function()
-                    newRoom:WaitForChild("RoomEntrance", 2)
-                    local newNodes = GetNodesFromRoom(newRoom, config.Movement.Reversed, config)
-                    for _, node in ipairs(newNodes) do
-                        if not table.find(pathfindNodes, node) then
-                            table.insert(pathfindNodes, node)
-                        end
-                    end
-                end)
-            end)
+					if damage.KillOnMove then
+						if not isMoving then
+							shouldDamage = false
+						end
+					end
 
-            local nodeIndex = 1
-            while nodeIndex <= #pathfindNodes and entity:IsAlive() do
-                local v = pathfindNodes[nodeIndex]
-                if v and v.Parent then
-                    local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                    EntityMoveTo(model, cframe, config)
-                    task.spawn(entity.RunCallback, entity, "OnReachNode", v)
-                end
-                nodeIndex = nodeIndex + 1
-            end
+					if shouldDamage then
+						model:SetAttribute("Damage", false)
 
-            if config.Rebounding.Enabled then
-                local reboundsCount = math.random(config.Rebounding.Min, config.Rebounding.Max)
-                for i = 1, reboundsCount do
-                    task.wait(config.Rebounding.Delay)
-                    model:SetAttribute("Damage", true)
-                    task.spawn(entity.RunCallback, entity, "OnRebounding", true)
+						if ripper and ripper.Enabled == true then
+							PlayRipperJumpscare(entity)
+						else
+							DamagePlayer(entity)
+						end
+					end
+				end
+			end
 
-                    for j = #pathfindNodes, 1, -1 do
-                        local v = pathfindNodes[j]
-                        if v and v.Parent then
-                            local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                            EntityMoveTo(model, cframe, config)
-                            task.spawn(entity.RunCallback, entity, "OnReachNode", v)
-                        end
-                    end
+			do
+				local camShake = config.CameraShake
+				if camShake.Enabled then
+					local mag = (charOrigin - origin).Magnitude
+					if mag <= camShake.Range then
+						local cloned = {}
+						for i, v in next, camShake.Values do
+							cloned[i] = v
+						end
 
-                    task.spawn(entity.RunCallback, entity, "OnRebounding", false)
-                    task.wait(config.Rebounding.Delay)
-                    model:SetAttribute("Damage", true)
-                    task.spawn(entity.RunCallback, entity, "OnRebounding", true)
-                    
-                    pathfindNodes = GetPathfindNodesAmbush(config)
+						cloned[1] = camShake.Values[1] / camShake.Range * (camShake.Range - mag)
+						cloned[2] = camShake.Values[2] / camShake.Range * (camShake.Range - mag)
+						Modules.Main_Game.camShaker:ShakeOnce(table.unpack(cloned))
+					end
+				end
+			end
+		end
+	end)
 
-                    local reIndex = 1
-                    while reIndex <= #pathfindNodes and entity:IsAlive() do
-                        local v = pathfindNodes[reIndex]
-                        if v and v.Parent then
-                            local cframe = v.Cframe + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                            EntityMoveTo(model, cframe, config)
-                            task.spawn(entity.RunCallback, entity, "OnReachNode", v)
-                        end
-                        reIndex = reIndex + 1
-                    end
+	task.spawn(function()
+		local reboundType = config.Rebounding.Type:upper()
+		if reboundType == "AMBUSH" then
+			local pathfindNodes = GetPathfindNodesAmbush(config)
 
-                    task.spawn(entity.RunCallback, entity, "OnRebounding", false)
+			local roomAddedConn
+			roomAddedConn = CurrentRooms.ChildAdded:Connect(function(newRoom)
+				task.spawn(function()
+					newRoom:WaitForChild("RoomEntrance", 2)
+					local newNodes = GetNodesFromRoom(newRoom, config.Movement.Reversed, config)
+					for _, node in ipairs(newNodes) do
+						if not table.find(pathfindNodes, node) then
+							table.insert(pathfindNodes, node)
+						end
+					end
+				end)
+			end)
 
-                    if i < reboundsCount then
-                        task.wait(config.Rebounding.Delay)
-                    end
-                end
-            end
+			local nodeIndex = 1
+			while nodeIndex <= #pathfindNodes and entity:IsAlive() do
+				local v = pathfindNodes[nodeIndex]
+				if v and v.Parent then
+					local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+					EntityMoveTo(model, cframe, config)
+					task.spawn(entity.RunCallback, entity, "OnReachNode", v)
+				end
+				nodeIndex = nodeIndex + 1
+			end
 
-            if roomAddedConn then
-                roomAddedConn:Disconnect()
-            end
+			if config.Rebounding.Enabled then
+				local reboundsCount = math.random(config.Rebounding.Min, config.Rebounding.Max)
+				for i = 1, reboundsCount do
+					task.wait(config.Rebounding.Delay)
+					model:SetAttribute("Damage", true)
+					task.spawn(entity.RunCallback, entity, "OnRebounding", true)
 
-        elseif reboundType == "BLITZ" then
-            local nodesToCurrent, _ = GetPathfindNodesBlitz(config)
-	
-            for _, n in next, nodesToCurrent do
-                if n and n.Parent then
-                    local cframe = n.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                    EntityMoveTo(model, cframe, config)
-                    task.spawn(entity.RunCallback, entity, "OnReachNode", n)
-                end
-            end
-            
-            if config.Rebounding.Enabled then
-                local currentRoom = GetCurrentRoom(false)
-                if not currentRoom then
-                    warn(debug.traceback("Failed to obtain current room."))
-                    return
-                end
+					for j = #pathfindNodes, 1, -1 do
+						local v = pathfindNodes[j]
+						if v and v.Parent then
+							local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+							EntityMoveTo(model, cframe, config)
+							task.spawn(entity.RunCallback, entity, "OnReachNode", v)
+						end
+					end
 
-                local roomNodes = GetNodesFromRoom(currentRoom, config.Movement.Reversed, config)
-                if #roomNodes == 1 then
-                    warn(debug.traceback("Failed to obtain current room."))
-                    return
-                end
+					task.spawn(entity.RunCallback, entity, "OnRebounding", false)
+					task.wait(config.Rebounding.Delay)
+					model:SetAttribute("Damage", true)
+					task.spawn(entity.RunCallback, entity, "OnRebounding", true)
 
-                local randomNode: BasePart? = nil;
-                if config.Movement.Reversed == false then
-                    randomNode = roomNodes[math.random(1, #roomNodes - 1)]
-                else
-                    randomNode = roomNodes[math.random(2, #roomNodes)]
-                end
-                if not randomNode then
-                    warn(debug.traceback("Failed to obtain current room Blitz node."))
-                    return
-                end
+					pathfindNodes = GetPathfindNodesAmbush(config)
 
-                for _ = 1, math.random(config.Rebounding.Min, config.Rebounding.Max) do
-                    model:SetAttribute("Damage", true)
-                    task.spawn(entity.RunCallback, entity, "OnRebounding", true)
-                    
-                    local nodeIndex = tonumber(randomNode.Name) or 1
-                    for i = #roomNodes, nodeIndex, -1 do
-                        local targetNode = roomNodes[math.clamp(i, 1, #roomNodes)]
-                        if targetNode and targetNode.Parent then
-                            local cframe = targetNode.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                            EntityMoveTo(model, cframe, config)
-                            task.spawn(entity.RunCallback, entity, "OnReachNode", targetNode)
-                        end
-                    end
-                    
-                    task.wait(config.Rebounding.Delay)
-                    model:SetAttribute("Damage", true)
-                    task.spawn(entity.RunCallback, entity, "OnRebounding", false)
+					local reIndex = 1
+					while reIndex <= #pathfindNodes and entity:IsAlive() do
+						local v = pathfindNodes[reIndex]
+						if v and v.Parent then
+							local cframe = v.Cframe + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+							EntityMoveTo(model, cframe, config)
+							task.spawn(entity.RunCallback, entity, "OnReachNode", v)
+						end
+						reIndex = reIndex + 1
+					end
 
-                    for i = nodeIndex, #roomNodes do
-                        local targetNode = roomNodes[math.clamp(i, 1, #roomNodes)]
-                        if targetNode and targetNode.Parent then
-                            local cframe = targetNode.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                            EntityMoveTo(model, cframe, config)
-                            task.spawn(entity.RunCallback, entity, "OnReachNode", targetNode)
-                        end
-                    end
-                end
-            end
-            
-            local _, updatedToEnd = GetPathfindNodesBlitz(config)
-            for _, n in next, updatedToEnd do
-                if n and n.Parent then
-                    local cframe = n.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                    EntityMoveTo(model, cframe, config)
-                    task.spawn(entity.RunCallback, entity, "OnReachNode", n)
-                end
-            end
-        end
+					task.spawn(entity.RunCallback, entity, "OnRebounding", false)
 
-        if not model:GetAttribute("Despawning") then
-            model:SetAttribute("Despawning", true)
+					if i < reboundsCount then
+						task.wait(config.Rebounding.Delay)
+					end
+				end
+			end
 
-            if config.Movement.EndWhenEnterLatestRoom then
-                task.spawn(entity.RunCallback, entity, "EndWhenGO")
-                if config.Movement.EndDelay and config.Movement.EndDelay > 0 then
-                    task.wait(config.Movement.EndDelay)
-                end
-            end
+			if roomAddedConn then
+				roomAddedConn:Disconnect()
+			end
 
-            task.spawn(entity.RunCallback, entity, "OnDespawning")
-            EntityMoveToSpeed(model, model:GetPivot() - Vector3.new(0, 300, 0), config.Movement.Speed or CONST.BASE_ENTITY_SPEED)
-            entity:Despawn()
-        end
-    end)
+		elseif reboundType == "BLITZ" then
+			local nodesToCurrent, _ = GetPathfindNodesBlitz(config)
+
+			for _, n in next, nodesToCurrent do
+				if n and n.Parent then
+					local cframe = n.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+					EntityMoveTo(model, cframe, config)
+					task.spawn(entity.RunCallback, entity, "OnReachNode", n)
+				end
+			end
+
+			if config.Rebounding.Enabled then
+				local currentRoom = GetCurrentRoom(false)
+				if not currentRoom then
+					warn(debug.traceback("Failed to obtain current room."))
+					return
+				end
+
+				local roomNodes = GetNodesFromRoom(currentRoom, config.Movement.Reversed, config)
+				if #roomNodes == 1 then
+					warn(debug.traceback("Failed to obtain current room."))
+					return
+				end
+
+				local randomNode: BasePart? = nil;
+				if config.Movement.Reversed == false then
+					randomNode = roomNodes[math.random(1, #roomNodes - 1)]
+				else
+					randomNode = roomNodes[math.random(2, #roomNodes)]
+				end
+				if not randomNode then
+					warn(debug.traceback("Failed to obtain current room Blitz node."))
+					return
+				end
+
+				for _ = 1, math.random(config.Rebounding.Min, config.Rebounding.Max) do
+					model:SetAttribute("Damage", true)
+					task.spawn(entity.RunCallback, entity, "OnRebounding", true)
+
+					local nodeIndex = tonumber(randomNode.Name) or 1
+					for i = #roomNodes, nodeIndex, -1 do
+						local targetNode = roomNodes[math.clamp(i, 1, #roomNodes)]
+						if targetNode and targetNode.Parent then
+							local cframe = targetNode.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+							EntityMoveTo(model, cframe, config)
+							task.spawn(entity.RunCallback, entity, "OnReachNode", targetNode)
+						end
+					end
+
+					task.wait(config.Rebounding.Delay)
+					model:SetAttribute("Damage", true)
+					task.spawn(entity.RunCallback, entity, "OnRebounding", false)
+
+					for i = nodeIndex, #roomNodes do
+						local targetNode = roomNodes[math.clamp(i, 1, #roomNodes)]
+						if targetNode and targetNode.Parent then
+							local cframe = targetNode.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+							EntityMoveTo(model, cframe, config)
+							task.spawn(entity.RunCallback, entity, "OnReachNode", targetNode)
+						end
+					end
+				end
+			end
+
+			local _, updatedToEnd = GetPathfindNodesBlitz(config)
+			for _, n in next, updatedToEnd do
+				if n and n.Parent then
+					local cframe = n.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+					EntityMoveTo(model, cframe, config)
+					task.spawn(entity.RunCallback, entity, "OnReachNode", n)
+				end
+			end
+		end
+
+		if not model:GetAttribute("Despawning") then
+			model:SetAttribute("Despawning", true)
+
+			if config.Movement.EndWhenEnterLatestRoom then
+				task.spawn(entity.RunCallback, entity, "EndWhenGO")
+				if config.Movement.EndDelay and config.Movement.EndDelay > 0 then
+					task.wait(config.Movement.EndDelay)
+				end
+			end
+
+			task.spawn(entity.RunCallback, entity, "OnDespawning")
+			EntityMoveToSpeed(model, model:GetPivot() - Vector3.new(0, 300, 0), config.Movement.Speed or CONST.BASE_ENTITY_SPEED)
+			entity:Despawn()
+		end
+	end)
 end
 
 if not getgenv()._internal_oghunger_entity_spawner then
@@ -1792,9 +1795,9 @@ if not getgenv()._internal_oghunger_entity_spawner then
 
 	local function GetAmbient(room: Model): Color3
 		return
-            room:GetAttribute("AmbientOriginal") :: Color3
-            or room:GetAttribute("Ambient") :: Color3
-            or Color3.fromRGB(67, 51, 56)
+			room:GetAttribute("AmbientOriginal") :: Color3
+			or room:GetAttribute("Ambient") :: Color3
+			or Color3.fromRGB(67, 51, 56)
 	end
 
 	for _, room in next, CurrentRooms:GetChildren() do
@@ -1804,32 +1807,32 @@ if not getgenv()._internal_oghunger_entity_spawner then
 	CurrentRooms.ChildAdded:Connect(function(room: Model)
 		Storage.Ambient[room] = GetAmbient(room)
 	end)
-	
+
 	workspace.DescendantRemoving:Connect(function(instance: Instance)
 		if instance.Name == "PathfindNodes" then
-            local latestRoom = GetCurrentRoom(true)
-            if latestRoom then
-                instance:Clone().Parent = latestRoom
-            end
-        end
+			local latestRoom = GetCurrentRoom(true)
+			if latestRoom then
+				instance:Clone().Parent = latestRoom
+			end
+		end
 	end)
 end
 
 Module.Clear = function(self)
-    for _, entity in next, self.ActiveEntities do
-        entity:Despawn()
-    end
+	for _, entity in next, self.ActiveEntities do
+		entity:Despawn()
+	end
 end
 
 Module.Unload = function(self)
-    self:Clear()
-    for i, v in self.Connections do
-        v:Disconnect()
-        self.Connections[i] = nil
-    end
-    for i in next, self do
-        self[i] = nil
-    end
+	self:Clear()
+	for i, v in self.Connections do
+		v:Disconnect()
+		self.Connections[i] = nil
+	end
+	for i in next, self do
+		self[i] = nil
+	end
 end
 
 getgenv().OgHungerNewSpawner = Module
