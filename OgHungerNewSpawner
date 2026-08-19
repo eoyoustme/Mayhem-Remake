@@ -987,7 +987,6 @@ local function DamagePlayer(entity: any)
     end
 end
 
--- === CẬP NHẬT: Xử lý ReboundMoving (Bỏ qua PathfindNodes nếu ReboundMoving = true) ===
 local function GetNodesFromRoom(room: Model, reversed: boolean, config: any?): { BasePart }
 	local nodes = {}
 	local roomEntrance = room:FindFirstChild("RoomEntrance")
@@ -998,7 +997,6 @@ local function GetNodesFromRoom(room: Model, reversed: boolean, config: any?): {
 		nodes[1] = n
 	end
 
-	-- Nếu ReboundMoving = true thì BỎ QUA PathfindNodes, chỉ đi thẳng từ RoomEntrance -> RoomExit
 	if not (config and config.Movement and config.Movement.ReboundMoving) then
 		local nodesFolder = room:FindFirstChild("PathfindNodes")
 		if nodesFolder then
@@ -1128,6 +1126,7 @@ local function EntityMoveToSpeed(model: Model, cframe: CFrame, speed: number)
 	repeat RunService.Stepped:Wait() until reached
 end
 
+-- === CẬP NHẬT: TWEEN MOVE TRỰC TIẾP DÙNG QUAD INOUT ===
 local function EntityMoveToTween(model: Model, targetCFrame: CFrame, duration: number)
     local startPivot = model:GetPivot()
     local elapsed = 0
@@ -1138,7 +1137,9 @@ local function EntityMoveToTween(model: Model, targetCFrame: CFrame, duration: n
         if not model:GetAttribute("Paused") then
             elapsed = elapsed + step
             local alpha = math.clamp(elapsed / math.max(duration, 0.01), 0, 1)
-            model:PivotTo(startPivot:Lerp(targetCFrame, alpha))
+            -- Áp dụng Quad InOut Easing Style
+            local quadAlpha = TweenService:GetValue(alpha, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+            model:PivotTo(startPivot:Lerp(targetCFrame, quadAlpha))
 
             if alpha >= 1 then
                 connection:Disconnect()
@@ -1295,7 +1296,6 @@ Module.Create = function(self, config: any): any?
     }
 end
 
--- === CẬP NHẬT: Thêm cờ isReboundRespawn để phân biệt lần Spawn do ReboundMoveStyle ===
 Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: boolean?)
     if copyEntity == true then
         self:Run(CloneTable(entity), false, isReboundRespawn)
@@ -1328,7 +1328,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
     model:SetAttribute("Running", true)
     self.ActiveEntities[#self.ActiveEntities + 1] = entity
 
-    -- === XỬ LÝ REBOUND MOVE STYLE (LẮNG NGHE LATESTROOM BẰNG CƠ CHẾ MỚI) ===
+    -- === CẬP NHẬT: SỬA LỖI REBOUND MOVE STYLE KHÔNG SPAWN KHI MỞ CỬA ===
     if config.Movement.ReboundMoveStyle and not model:GetAttribute("ReboundStyleStarted") then
         model:SetAttribute("ReboundStyleStarted", true)
         
@@ -1341,8 +1341,14 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
             local latestRoomVal = gameData and gameData:FindFirstChild("LatestRoom")
 
             if latestRoomVal then
-                for _ = 1, times do
-                    latestRoomVal.Changed:Wait()
+                local count = 0
+                local connection
+                connection = latestRoomVal.Changed:Connect(function()
+                    if count >= times then
+                        connection:Disconnect()
+                        return
+                    end
+                    count = count + 1
 
                     if soundId and soundId ~= "" and soundId ~= "rbxassetid://" then
                         local sound = Instance.new("Sound")
@@ -1353,9 +1359,13 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
                         Debris:AddItem(sound, 5)
                     end
 
-                    -- Chạy lại Entity nhưng đánh dấu isReboundRespawn = true (Để BỎ QUA hiệu ứng Spawned)
-                    Module:Run(entity, true, true)
-                end
+                    -- Tạo bản thể Entity mới hoàn toàn từ config để spawn tiếp khi mở cửa
+                    local newEntity = Module:Create(config)
+                    if newEntity then
+                        newEntity.Debug = CloneTable(entity.Debug)
+                        Module:Run(newEntity, false, true)
+                    end
+                end)
             end
         end)
     end
@@ -1382,7 +1392,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
     model.Parent = workspace
     task.spawn(entity.RunCallback, entity, "OnSpawned")
 
-    -- === CẬP NHẬT: CHỈ ĐỔI MÀU/RAINBOW Ở LẦN SPAWN ĐẦU TIÊN (Bỏ qua khi ReboundRespawn) ===
+    -- CHỈ ĐỔI MÀU/RAINBOW Ở LẦN SPAWN ĐẦU TIÊN (Bỏ qua khi ReboundRespawn)
     if not isReboundRespawn and config.Spawned and config.Spawned.ChangeColorWhenSpawn then
         task.spawn(function()
             local colorCorrection = Lighting:FindFirstChild("MainColorCorrection")
@@ -1430,7 +1440,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
         end)
     end
 
-    -- === CẬP NHẬT: BỎ QUA FLICKER & EARTHQUAKE KHI LÀ LẦN REBOUND RESPAWN ===
+    -- BỎ QUA FLICKER & EARTHQUAKE KHI LÀ LẦN REBOUND RESPAWN
     local currentRoom = GetCurrentRoom(false)
     if not isReboundRespawn and currentRoom then
         if config.Lights.Flicker.Enabled then
@@ -1528,7 +1538,6 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
                 end
             end
 
-            -- === XỬ LÝ SÁT THƯƠNG VÀ JUMPSCARE RIPPER ===
             if
                 not model:GetAttribute("Paused")
                 and not usedCrucifix
