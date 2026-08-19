@@ -1644,6 +1644,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 				end)
 			end)
 
+			-- Lượt đi ban đầu
 			local nodeIndex = 1
 			while nodeIndex <= #pathfindNodes and entity:IsAlive() do
 				local v = pathfindNodes[nodeIndex]
@@ -1655,6 +1656,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 				nodeIndex = nodeIndex + 1
 			end
 
+			-- Lượt Rebounding
 			if config.Rebounding.Enabled then
 				local reboundsCount = math.random(config.Rebounding.Min, config.Rebounding.Max)
 				for i = 1, reboundsCount do
@@ -1662,6 +1664,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 					model:SetAttribute("Damage", true)
 					task.spawn(entity.RunCallback, entity, "OnRebounding", true)
 
+					-- Chạy lùi về
 					for j = #pathfindNodes, 1, -1 do
 						local v = pathfindNodes[j]
 						if v and v.Parent then
@@ -1678,11 +1681,12 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 					pathfindNodes = GetPathfindNodesAmbush(config)
 
+					-- Chạy tiến lên (Đã sửa v.Cframe thành v.CFrame)
 					local reIndex = 1
 					while reIndex <= #pathfindNodes and entity:IsAlive() do
 						local v = pathfindNodes[reIndex]
 						if v and v.Parent then
-							local cframe = v.Cframe + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+							local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
 							EntityMoveTo(model, cframe, config)
 							task.spawn(entity.RunCallback, entity, "OnReachNode", v)
 						end
@@ -1714,52 +1718,41 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 			if config.Rebounding.Enabled then
 				local currentRoom = GetCurrentRoom(false)
-				if not currentRoom then
-					warn(debug.traceback("Failed to obtain current room."))
-					return
-				end
+				if currentRoom then
+					local roomNodes = GetNodesFromRoom(currentRoom, config.Movement.Reversed, config)
+					if #roomNodes > 1 then
+						local randomNode = config.Movement.Reversed == false 
+							and roomNodes[math.random(1, #roomNodes - 1)] 
+							or roomNodes[math.random(2, #roomNodes)]
 
-				local roomNodes = GetNodesFromRoom(currentRoom, config.Movement.Reversed, config)
-				if #roomNodes == 1 then
-					warn(debug.traceback("Failed to obtain current room."))
-					return
-				end
+						if randomNode then
+							for _ = 1, math.random(config.Rebounding.Min, config.Rebounding.Max) do
+								model:SetAttribute("Damage", true)
+								task.spawn(entity.RunCallback, entity, "OnRebounding", true)
 
-				local randomNode: BasePart? = nil;
-				if config.Movement.Reversed == false then
-					randomNode = roomNodes[math.random(1, #roomNodes - 1)]
-				else
-					randomNode = roomNodes[math.random(2, #roomNodes)]
-				end
-				if not randomNode then
-					warn(debug.traceback("Failed to obtain current room Blitz node."))
-					return
-				end
+								local nodeIndex = tonumber(randomNode.Name) or 1
+								for i = #roomNodes, nodeIndex, -1 do
+									local targetNode = roomNodes[math.clamp(i, 1, #roomNodes)]
+									if targetNode and targetNode.Parent then
+										local cframe = targetNode.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+										EntityMoveTo(model, cframe, config)
+										task.spawn(entity.RunCallback, entity, "OnReachNode", targetNode)
+									end
+								end
 
-				for _ = 1, math.random(config.Rebounding.Min, config.Rebounding.Max) do
-					model:SetAttribute("Damage", true)
-					task.spawn(entity.RunCallback, entity, "OnRebounding", true)
+								task.wait(config.Rebounding.Delay)
+								model:SetAttribute("Damage", true)
+								task.spawn(entity.RunCallback, entity, "OnRebounding", false)
 
-					local nodeIndex = tonumber(randomNode.Name) or 1
-					for i = #roomNodes, nodeIndex, -1 do
-						local targetNode = roomNodes[math.clamp(i, 1, #roomNodes)]
-						if targetNode and targetNode.Parent then
-							local cframe = targetNode.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-							EntityMoveTo(model, cframe, config)
-							task.spawn(entity.RunCallback, entity, "OnReachNode", targetNode)
-						end
-					end
-
-					task.wait(config.Rebounding.Delay)
-					model:SetAttribute("Damage", true)
-					task.spawn(entity.RunCallback, entity, "OnRebounding", false)
-
-					for i = nodeIndex, #roomNodes do
-						local targetNode = roomNodes[math.clamp(i, 1, #roomNodes)]
-						if targetNode and targetNode.Parent then
-							local cframe = targetNode.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-							EntityMoveTo(model, cframe, config)
-							task.spawn(entity.RunCallback, entity, "OnReachNode", targetNode)
+								for i = nodeIndex, #roomNodes do
+									local targetNode = roomNodes[math.clamp(i, 1, #roomNodes)]
+									if targetNode and targetNode.Parent then
+										local cframe = targetNode.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+										EntityMoveTo(model, cframe, config)
+										task.spawn(entity.RunCallback, entity, "OnReachNode", targetNode)
+									end
+								end
+							end
 						end
 					end
 				end
@@ -1775,7 +1768,8 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 			end
 		end
 
-		if not model:GetAttribute("Despawning") then
+		-- Kích hoạt Despawn sau khi chạy xong Rebound
+		if entity:IsAlive() and not model:GetAttribute("Despawning") then
 			model:SetAttribute("Despawning", true)
 
 			if config.Movement.EndWhenEnterLatestRoom then
