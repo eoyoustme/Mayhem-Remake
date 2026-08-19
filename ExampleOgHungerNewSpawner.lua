@@ -10,9 +10,9 @@ end
 
 local entity = Spawner:Create({
 	Entity = {
-		Name = "Rush (templete)",
+		Name = "Rush (Templete Entity)",
 		Asset = "https://github.com/RegularVynixu/DOORS-Entity-Spawner-V2/raw/main/Assets/Entities/Rush.rbxm",
-		HeightOffset = 0
+		HeightOffset = -1
 	},
 	Lights = {
 		Flicker = {
@@ -23,7 +23,7 @@ local entity = Spawner:Create({
 		Repair = false
 	},
 	Earthquake = {
-		Enabled = true
+		Enabled = false
 	},
 	Spawned = {
 		ChangeColorWhenSpawn = false, 
@@ -38,7 +38,7 @@ local entity = Spawner:Create({
 
 	Movement = {
 		Speed = 100,
-		SpeedFast = 1700,                  
+		SpeedFast = 470,                  
 		MoveFastNotEnter = false,            
 		Delay = 2,
 		Reversed = false,                  
@@ -49,12 +49,13 @@ local entity = Spawner:Create({
 		TweenSecond = 1.5,            
 
 		ReboundMoveStyle = false,      
-		ReboundStyleTimes = 3,         
-		ReboundStyleSound = "rbxassetid://130994177179386", 
+		ReboundStyleTimes = 5,        
+		ReboundStyleSound = "rbxassetid://9114221327", 
 		ReboundStyleVolume = 5,
+		ReboundStyleDelay = 2, 
 
-		ChasePlayerWhenSee = false,
-		SpeedWhenChase = 7.5
+		ChasePlayerWhenSee = true,
+		SpeedWhenChase = 35
 	},
 
 	Jumpscare = {
@@ -154,7 +155,6 @@ entity:SetCallback("OnDespawned", function()
 end)
 
 entity:SetCallback("OnDamagePlayer", function(newHealth: number)
-
 end)
 
 ---====== Run Entity ======---
