@@ -1452,16 +1452,17 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
                 end
             end
 
+            -- === XỬ LÝ SÁT THƯƠNG VÀ JUMPSCARE RIPPER ===
             if
                 not model:GetAttribute("Paused")
                 and not usedCrucifix
             then
                 local damage = config.Damage
                 local ripper = damage.JumpscareRipper
-                local isDamageActive = damage.Enabled or (ripper and ripper.Enabled)
 
+                -- DAMAGE BẮT BUỘC PHẢI BẬT (damage.Enabled == true)
                 if
-                    isDamageActive
+                    damage.Enabled == true
                     and damage.Range > 0
                     and Humanoid.Health > 0
                     and (not Character:GetAttribute("Hiding") or damage.IgnoreHiding)
@@ -1471,9 +1472,12 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
                     and inSight
                 then
                     model:SetAttribute("Damage", false)
-                    if ripper and ripper.Enabled then
+
+                    -- NẾU JUMPSCARE RIPPER CŨNG BẬT (ripper.Enabled == true) -> CHẠY JUMPSCARE RIPPER, KHÔNG MẤT MÁU TRỰC TIẾP
+                    if ripper and ripper.Enabled == true then
                         PlayRipperJumpscare(entity)
                     else
+                        -- NẾU JUMPSCARE RIPPER TẮT -> TRỪ MÁU BÌNH THƯỜNG
                         DamagePlayer(entity)
                     end
                 end
