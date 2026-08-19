@@ -998,7 +998,7 @@ end
 local function GetNodesFromRoom(room: Model, reversed: boolean, config: any?): { BasePart }
 	local nodes = {}
 
-	local roomEntrance = room:FindFirstChild("RoomEntrance") or room:WaitForChild("RoomEntrance", 1)
+	local roomEntrance = room:FindFirstChild("RoomEntrance") or room:WaitForChild("RoomEntrance", 2)
 	if roomEntrance then
 		table.insert(nodes, roomEntrance)
 	end
@@ -1018,7 +1018,7 @@ local function GetNodesFromRoom(room: Model, reversed: boolean, config: any?): {
 		end
 	end
 
-	local roomExit = room:FindFirstChild("RoomExit") or room:WaitForChild("RoomExit", 1)
+	local roomExit = room:FindFirstChild("RoomExit") or room:WaitForChild("RoomExit", 2)
 	if roomExit then
 		table.insert(nodes, roomExit)
 	end
@@ -1041,33 +1041,27 @@ local function GetPathfindNodesAmbush(config: any): { BasePart }
 
 	if config.Movement.Reversed == false then
 		for _, room in ipairs(rooms) do
+			local roomNodes = GetNodesFromRoom(room, false, config)
+
+			for _, node in ipairs(roomNodes) do
+				pathfindNodes[#pathfindNodes + 1] = node
+			end
+
 			if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
-				local roomEntrance = room:FindFirstChild("RoomEntrance")
-				if roomEntrance then
-					pathfindNodes[#pathfindNodes + 1] = roomEntrance
-				end
 				break
-			else
-				local roomNodes = GetNodesFromRoom(room, false, config)
-				for _, node in ipairs(roomNodes) do
-					pathfindNodes[#pathfindNodes + 1] = node
-				end
 			end
 		end
 	else
 		for i = #rooms, 1, -1 do
 			local room = rooms[i]
+			local roomNodes = GetNodesFromRoom(room, true, config)
+
+			for _, node in ipairs(roomNodes) do
+				pathfindNodes[#pathfindNodes + 1] = node
+			end
+
 			if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
-				local roomExit = room:FindFirstChild("RoomExit") or room:FindFirstChild("RoomEntrance")
-				if roomExit then
-					pathfindNodes[#pathfindNodes + 1] = roomExit
-				end
 				break
-			else
-				local roomNodes = GetNodesFromRoom(room, true, config)
-				for _, node in ipairs(roomNodes) do
-					pathfindNodes[#pathfindNodes + 1] = node
-				end
 			end
 		end
 	end
@@ -1082,51 +1076,37 @@ local function GetPathfindNodesBlitz(config: any): ({BasePart}, {BasePart})
 
 	if config.Movement.Reversed == false then
 		for _, room in ipairs(rooms) do
+			local roomNodes = GetNodesFromRoom(room, false, config)
 			local roomIndex = tonumber(room.Name) or 0
+
+			for _, node in ipairs(roomNodes) do
+				if roomIndex <= currentRoomIndex then
+					nodesToCurrent[#nodesToCurrent + 1] = node
+				else
+					nodesToEnd[#nodesToEnd + 1] = node
+				end
+			end
+
 			if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
-				local roomEntrance = room:FindFirstChild("RoomEntrance")
-				if roomEntrance then
-					if roomIndex <= currentRoomIndex then
-						nodesToCurrent[#nodesToCurrent + 1] = roomEntrance
-					else
-						nodesToEnd[#nodesToEnd + 1] = roomEntrance
-					end
-				end
 				break
-			else
-				local roomNodes = GetNodesFromRoom(room, false, config)
-				for _, node in ipairs(roomNodes) do
-					if roomIndex <= currentRoomIndex then
-						nodesToCurrent[#nodesToCurrent + 1] = node
-					else
-						nodesToEnd[#nodesToEnd + 1] = node
-					end
-				end
 			end
 		end
 	else
 		for i = #rooms, 1, -1 do
 			local room = rooms[i]
+			local roomNodes = GetNodesFromRoom(room, true, config)
 			local roomIndex = tonumber(room.Name) or 0
+
+			for _, node in ipairs(roomNodes) do
+				if roomIndex >= currentRoomIndex then
+					nodesToCurrent[#nodesToCurrent + 1] = node
+				else
+					nodesToEnd[#nodesToEnd + 1] = node
+				end
+			end
+
 			if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
-				local roomExit = room:FindFirstChild("RoomExit") or room:FindFirstChild("RoomEntrance")
-				if roomExit then
-					if roomIndex >= currentRoomIndex then
-						nodesToCurrent[#nodesToCurrent + 1] = roomExit
-					else
-						nodesToEnd[#nodesToEnd + 1] = roomExit
-					end
-				end
 				break
-			else
-				local roomNodes = GetNodesFromRoom(room, true, config)
-				for _, node in ipairs(roomNodes) do
-					if roomIndex >= currentRoomIndex then
-						nodesToCurrent[#nodesToCurrent + 1] = node
-					else
-						nodesToEnd[#nodesToEnd + 1] = node
-					end
-				end
 			end
 		end 
 	end
@@ -1730,8 +1710,14 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 			local roomAddedConn
 			roomAddedConn = CurrentRooms.ChildAdded:Connect(function(newRoom)
 				task.spawn(function()
-					task.wait(0.2)
-					pathfindNodes = GetPathfindNodesAmbush(config)
+					newRoom:WaitForChild("RoomEntrance", 2)
+					local newNodes = GetNodesFromRoom(newRoom, config.Movement.Reversed, config)
+
+					for _, node in ipairs(newNodes) do
+						if not table.find(pathfindNodes, node) then
+							table.insert(pathfindNodes, node)
+						end
+					end
 				end)
 			end)
 
