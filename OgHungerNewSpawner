@@ -207,7 +207,6 @@ end
 
 local function GetCurrentRoom(latest: boolean): Model?
 	if latest then
-		-- Lấy phòng mới nhất trực tiếp từ ReplicatedStorage của DOORS
 		local latestRoomNum = GameData and GameData:FindFirstChild("LatestRoom") and GameData.LatestRoom.Value
 		if latestRoomNum then
 			return CurrentRooms:FindFirstChild(tostring(latestRoomNum))
@@ -1038,6 +1037,11 @@ local function GetPathfindNodesAmbush(config: any): { BasePart }
 	if config.Movement.Reversed == false then
 		for _, room in ipairs(rooms) do
 			if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
+				-- Thêm cổng vào của phòng mới nhất trước khi dừng
+				local roomEntrance = room:FindFirstChild("RoomEntrance")
+				if roomEntrance then
+					pathfindNodes[#pathfindNodes + 1] = roomEntrance
+				end
 				break
 			end
 
@@ -1050,7 +1054,11 @@ local function GetPathfindNodesAmbush(config: any): { BasePart }
 		for i = #rooms, 1, -1 do
 			local room = rooms[i]
 			if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
-				continue
+				local roomExit = room:FindFirstChild("RoomExit")
+				if roomExit then
+					pathfindNodes[#pathfindNodes + 1] = roomExit
+				end
+				break
 			end
 
 			local roomNodes = GetNodesFromRoom(room, true, config)
@@ -1071,6 +1079,15 @@ local function GetPathfindNodesBlitz(config: any): ({BasePart}, {BasePart})
 	if config.Movement.Reversed == false then
 		for _, room in ipairs(rooms) do
 			if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
+				local roomEntrance = room:FindFirstChild("RoomEntrance")
+				if roomEntrance then
+					local roomIndex = tonumber(room.Name) or 0
+					if roomIndex <= currentRoomIndex then
+						nodesToCurrent[#nodesToCurrent + 1] = roomEntrance
+					else
+						nodesToEnd[#nodesToEnd + 1] = roomEntrance
+					end
+				end
 				break
 			end
 
@@ -1089,7 +1106,16 @@ local function GetPathfindNodesBlitz(config: any): ({BasePart}, {BasePart})
 		for i = #rooms, 1, -1 do
 			local room = rooms[i]
 			if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
-				continue
+				local roomExit = room:FindFirstChild("RoomExit")
+				if roomExit then
+					local roomIndex = tonumber(room.Name) or 0
+					if roomIndex >= currentRoomIndex then
+						nodesToCurrent[#nodesToCurrent + 1] = roomExit
+					else
+						nodesToEnd[#nodesToEnd + 1] = roomExit
+					end
+				end
+				break
 			end
 
 			local roomNodes = GetNodesFromRoom(room, true, config)
