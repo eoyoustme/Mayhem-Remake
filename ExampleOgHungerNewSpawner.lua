@@ -10,7 +10,7 @@ end
 
 local entity = Spawner:Create({
 	Entity = {
-		Name = "Template Entity",
+		Name = "Rush (templete)",
 		Asset = "https://github.com/RegularVynixu/DOORS-Entity-Spawner-V2/raw/main/Assets/Entities/Rush.rbxm",
 		HeightOffset = 0
 	},
@@ -38,10 +38,12 @@ local entity = Spawner:Create({
 
 	Movement = {
 		Speed = 100,
+		SpeedFast = 1700,                  
+		MoveFastNotEnter = false,            
 		Delay = 2,
-		Reversed = true,                  
+		Reversed = false,                  
 		EndWhenEnterLatestRoom = false,   
-		EndDelay = 2.5,
+		EndDelay = 0,
 
 		ReboundMoving = false,          
 		TweenSecond = 1.5,            
@@ -78,6 +80,7 @@ local entity = Spawner:Create({
 	},
 	Damage = {
 		Enabled = true,
+		KillOnMove = false,            
 		Range = 40,
 		Amount = 125,
 		IgnoreHiding = false,
@@ -89,7 +92,7 @@ local entity = Spawner:Create({
 			ParticleName = "ParticleEmitter",
 			ParticleTexture = "rbxassetid://12737595583",
 			SoundUrl = "https://github.com/eoyoustme/back/raw/main/Kill_with_static.mp3",
-			SlamSoundId = "rbxassetid://1837829565",
+			SlamSoundId = "rbxassetid://0",
 			EndSoundId = "rbxassetid://4988621968",
 			Images = {
 				"rbxassetid://8482795900",
@@ -133,7 +136,6 @@ entity:SetCallback("OnRebounding", function(startOfRebound: boolean)
 end)
 
 entity:SetCallback("EndWhenGO", function()
-
 end)
 
 entity:SetCallback("OnDespawning", function()
