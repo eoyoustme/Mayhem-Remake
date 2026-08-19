@@ -993,7 +993,9 @@ end
 
 local function GetNodesFromRoom(room: Model, reversed: boolean, config: any?): { BasePart }
 	local nodes = {}
-	local roomEntrance = room:FindFirstChild("RoomEntrance")
+
+	-- Đảm bảo chờ RoomEntrance và RoomExit load đầy đủ
+	local roomEntrance = room:FindFirstChild("RoomEntrance") or room:WaitForChild("RoomEntrance", 2)
 	if roomEntrance then
 		table.insert(nodes, roomEntrance)
 	end
@@ -1013,7 +1015,7 @@ local function GetNodesFromRoom(room: Model, reversed: boolean, config: any?): {
 		end
 	end
 
-	local roomExit = room:FindFirstChild("RoomExit")
+	local roomExit = room:FindFirstChild("RoomExit") or room:WaitForChild("RoomExit", 2)
 	if roomExit then
 		table.insert(nodes, roomExit)
 	end
@@ -1028,6 +1030,7 @@ local function GetNodesFromRoom(room: Model, reversed: boolean, config: any?): {
 
 	return nodes
 end
+
 
 local function GetPathfindNodesAmbush(config: any): { BasePart }
 	local pathfindNodes = {}
