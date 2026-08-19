@@ -89,7 +89,9 @@ local CONST = {
 				ReboundMoveStyle = false,
 				ReboundStyleTimes = 1,
 				ReboundStyleSound = "rbxassetid://0",
-				ReboundStyleVolume = 1
+				ReboundStyleVolume = 1,
+				ChasePlayerWhenSee = false,
+				SpeedWhenChase = 7.5
 			},
 			Damage = {
 				Enabled = true,
@@ -184,6 +186,7 @@ local CONST = {
 			OnDespawned = function() end,
 			OnDamagePlayer = function() end,
 			EndWhenGO = function() end,
+			PlayerGetSee = function() end,
 			CrucifixionOverwrite = nil
 		}
 	}
@@ -994,7 +997,7 @@ end
 local function GetNodesFromRoom(room: Model, reversed: boolean, config: any?): { BasePart }
 	local nodes = {}
 
-	-- Đảm bảo chờ RoomEntrance và RoomExit load đầy đủ
+	-- Ð?m b?o ch? RoomEntrance và RoomExit load d?y d?
 	local roomEntrance = room:FindFirstChild("RoomEntrance") or room:WaitForChild("RoomEntrance", 2)
 	if roomEntrance then
 		table.insert(nodes, roomEntrance)
@@ -1505,6 +1508,62 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 				inSight = workspace:Raycast(origin, charOrigin - origin, params) == nil
 			end
 
+			if config.Movement and config.Movement.ChasePlayerWhenSee and not model:GetAttribute("IsChasing") then
+				local basepart = model:FindFirstChildWhichIsA("BasePart", true)
+				if basepart then
+					local params = RaycastParams.new()
+					params.FilterType = Enum.RaycastFilterType.Exclude
+					params.FilterDescendantsInstances = {model}
+
+					local direction = charOrigin - basepart.Position
+					local rayResult = workspace:Raycast(basepart.Position, direction, params)
+
+					if rayResult and rayResult.Instance:IsDescendantOf(Character) then
+						model:SetAttribute("IsChasing", true)
+						task.spawn(entity.RunCallback, entity, "PlayerGetSee")
+
+						local Cayracto = Character
+						local deergod = model
+						local chaseSpeed = config.Movement.SpeedWhenChase or 7.5
+
+						local connection
+						local function followPlayer(dt)
+							if not Cayracto or not basepart or not deergod then return end
+
+							local hrp = Cayracto:FindFirstChild("HumanoidRootPart") or Cayracto.PrimaryPart
+							if not hrp then return end
+
+							local currentPos = basepart.Position
+							local targetPos = hrp.Position
+							local distance = (targetPos - currentPos).Magnitude
+
+							if distance > 0.5 then
+								local dir = (targetPos - currentPos).Unit
+								local newPos = currentPos + (dir * chaseSpeed * dt)
+								local lookTarget = Vector3.new(targetPos.X, newPos.Y, targetPos.Z)
+
+								if (lookTarget - newPos).Magnitude > 0.001 then
+									deergod:PivotTo(CFrame.lookAt(newPos, lookTarget))
+								else
+									deergod:PivotTo(CFrame.new(newPos))
+								end
+							end
+						end
+
+						connection = RunService.RenderStepped:Connect(function(dt)
+							if not basepart or not basepart.Parent or not deergod or not deergod.Parent then
+								if connection then
+									connection:Disconnect()
+									connection = nil
+								end
+								return
+							end
+							followPlayer(dt)
+						end)
+					end
+				end
+			end
+
 			if Humanoid.Health > 0 then
 				local _, isVisible = Camera:WorldToViewportPoint(origin)
 				if isVisible then
@@ -1644,7 +1703,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 				end)
 			end)
 
-			-- Lượt đi ban đầu
+			-- Lu?t di ban d?u
 			local nodeIndex = 1
 			while nodeIndex <= #pathfindNodes and entity:IsAlive() do
 				local v = pathfindNodes[nodeIndex]
@@ -1656,7 +1715,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 				nodeIndex = nodeIndex + 1
 			end
 
-			-- Lượt Rebounding
+			-- Lu?t Rebounding
 			if config.Rebounding.Enabled then
 				local reboundsCount = math.random(config.Rebounding.Min, config.Rebounding.Max)
 				for i = 1, reboundsCount do
@@ -1664,7 +1723,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 					model:SetAttribute("Damage", true)
 					task.spawn(entity.RunCallback, entity, "OnRebounding", true)
 
-					-- Chạy lùi về
+					-- Ch?y lùi v?
 					for j = #pathfindNodes, 1, -1 do
 						local v = pathfindNodes[j]
 						if v and v.Parent then
@@ -1681,7 +1740,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 					pathfindNodes = GetPathfindNodesAmbush(config)
 
-					-- Chạy tiến lên (Đã sửa v.Cframe thành v.CFrame)
+					-- Ch?y ti?n lên (Ðã s?a v.Cframe thành v.CFrame)
 					local reIndex = 1
 					while reIndex <= #pathfindNodes and entity:IsAlive() do
 						local v = pathfindNodes[reIndex]
@@ -1768,7 +1827,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 			end
 		end
 
-		-- Kích hoạt Despawn sau khi chạy xong Rebound
+		-- Kích ho?t Despawn sau khi ch?y xong Rebound
 		if entity:IsAlive() and not model:GetAttribute("Despawning") then
 			model:SetAttribute("Despawning", true)
 
