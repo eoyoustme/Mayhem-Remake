@@ -21,6 +21,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
+local Debris = game:GetService("Debris")
 
 -- \\ Variables // --
 
@@ -81,7 +82,13 @@ local CONST = {
 				Delay = 2,
 				Reversed = false,
 				EndWhenEnterLatestRoom = false,
-				EndDelay = 0
+				EndDelay = 0,
+				ReboundMoving = false,
+				TweenSecond = 1,
+				ReboundMoveStyle = false,
+				ReboundStyleTimes = 1,
+				ReboundStyleSound = "rbxassetid://0",
+				ReboundStyleVolume = 1
 			},
 			Damage = {
 				Enabled = true,
@@ -1097,7 +1104,7 @@ local function GetPathfindNodesBlitz(config: any): ({BasePart}, {BasePart})
 	return nodesToCurrent, nodesToEnd
 end
 
-local function EntityMoveTo(model: Model, cframe: CFrame, speed: number)
+local function EntityMoveToSpeed(model: Model, cframe: CFrame, speed: number)
 	local reached = false
 	local connection; connection = RunService.Stepped:Connect(function(_, step)
 		if not model:GetAttribute("Paused") then
@@ -1115,6 +1122,36 @@ local function EntityMoveTo(model: Model, cframe: CFrame, speed: number)
 		end
 	end)
 	repeat RunService.Stepped:Wait() until reached
+end
+
+local function EntityMoveToTween(model: Model, targetCFrame: CFrame, duration: number)
+    local startPivot = model:GetPivot()
+    local elapsed = 0
+    local connection
+    local reached = false
+
+    connection = RunService.Stepped:Connect(function(_, step)
+        if not model:GetAttribute("Paused") then
+            elapsed = elapsed + step
+            local alpha = math.clamp(elapsed / math.max(duration, 0.01), 0, 1)
+            model:PivotTo(startPivot:Lerp(targetCFrame, alpha))
+
+            if alpha >= 1 then
+                connection:Disconnect()
+                reached = true
+            end
+        end
+    end)
+
+    repeat RunService.Stepped:Wait() until reached
+end
+
+local function EntityMoveTo(model: Model, cframe: CFrame, config: any)
+    if config.Movement and config.Movement.ReboundMoving then
+        EntityMoveToTween(model, cframe, config.Movement.TweenSecond or 1)
+    else
+        EntityMoveToSpeed(model, cframe, config.Movement.Speed or CONST.BASE_ENTITY_SPEED)
+    end
 end
 
 local function Earthquake()
@@ -1285,6 +1322,37 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
 
     model:SetAttribute("Running", true)
     self.ActiveEntities[#self.ActiveEntities + 1] = entity
+
+    -- === XỬ LÝ REBOUND MOVE STYLE (LẮNG NGHE LATESTROOM) ===
+    if config.Movement.ReboundMoveStyle and not model:GetAttribute("ReboundStyleStarted") then
+        model:SetAttribute("ReboundStyleStarted", true)
+        
+        task.spawn(function()
+            local times = math.clamp(tonumber(config.Movement.ReboundStyleTimes) or 1, 1, 7)
+            local soundId = config.Movement.ReboundStyleSound
+            local volume = config.Movement.ReboundStyleVolume or 1
+
+            local gameData = ReplicatedStorage:FindFirstChild("GameData")
+            local latestRoomVal = gameData and gameData:FindFirstChild("LatestRoom")
+
+            if latestRoomVal then
+                for _ = 1, times do
+                    latestRoomVal.Changed:Wait()
+
+                    if soundId and soundId ~= "" and soundId ~= "rbxassetid://" then
+                        local sound = Instance.new("Sound")
+                        sound.SoundId = soundId
+                        sound.Volume = volume
+                        sound.Parent = workspace
+                        sound:Play()
+                        Debris:AddItem(sound, 5)
+                    end
+
+                    Module:Run(entity, true)
+                end
+            end
+        end)
+    end
 
     local spawnPoint: BasePart? = nil
     do
@@ -1460,7 +1528,6 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
                 local damage = config.Damage
                 local ripper = damage.JumpscareRipper
 
-                -- DAMAGE BẮT BUỘC PHẢI BẬT (damage.Enabled == true)
                 if
                     damage.Enabled == true
                     and damage.Range > 0
@@ -1473,11 +1540,9 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
                 then
                     model:SetAttribute("Damage", false)
 
-                    -- NẾU JUMPSCARE RIPPER CŨNG BẬT (ripper.Enabled == true) -> CHẠY JUMPSCARE RIPPER, KHÔNG MẤT MÁU TRỰC TIẾP
                     if ripper and ripper.Enabled == true then
                         PlayRipperJumpscare(entity)
                     else
-                        -- NẾU JUMPSCARE RIPPER TẮT -> TRỪ MÁU BÌNH THƯỜNG
                         DamagePlayer(entity)
                     end
                 end
@@ -1508,7 +1573,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
             local pathfindNodes = GetPathfindNodesAmbush(config)
             for _, v in next, pathfindNodes do
                 local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                EntityMoveTo(model, cframe, config.Movement.Speed)
+                EntityMoveTo(model, cframe, config)
                 task.spawn(entity.RunCallback, entity, "OnReachNode", v)
             end
             
@@ -1522,7 +1587,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
                     for i = #pathfindNodes, 1, -1 do
                         local v = pathfindNodes[i]
                         local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                        EntityMoveTo(model, cframe, config.Movement.Speed)
+                        EntityMoveTo(model, cframe, config)
                         task.spawn(entity.RunCallback, entity, "OnReachNode", v)
                     end
 
@@ -1534,7 +1599,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
 
                     for _, v in next, pathfindNodes do
                         local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                        EntityMoveTo(model, cframe, config.Movement.Speed)
+                        EntityMoveTo(model, cframe, config)
                         task.spawn(entity.RunCallback, entity, "OnReachNode", v)
                     end
 
@@ -1550,7 +1615,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
 	
             for _, n in next, nodesToCurrent do
                 local cframe = n.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                EntityMoveTo(model, cframe, config.Movement.Speed)
+                EntityMoveTo(model, cframe, config)
                 task.spawn(entity.RunCallback, entity, "OnReachNode", n)
             end
             
@@ -1585,7 +1650,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
                     local nodeIndex = tonumber(randomNode.Name)
                     for i = #roomNodes, nodeIndex, -1 do
                         local cframe = roomNodes[math.clamp(i, 1, #roomNodes)].CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                        EntityMoveTo(model, cframe, config.Movement.Speed)
+                        EntityMoveTo(model, cframe, config)
                         task.spawn(entity.RunCallback, entity, "OnReachNode", roomNodes[i])
                     end
                     
@@ -1595,7 +1660,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
 
                     for i = nodeIndex, #roomNodes do
                         local cframe = roomNodes[math.clamp(i, 1, #roomNodes)].CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                        EntityMoveTo(model, cframe, config.Movement.Speed)
+                        EntityMoveTo(model, cframe, config)
                         task.spawn(entity.RunCallback, entity, "OnReachNode", roomNodes[i])
                     end
                 end
@@ -1604,7 +1669,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
             local _, updatedToEnd = GetPathfindNodesBlitz(config)
             for _, n in next, updatedToEnd do
                 local cframe = n.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                EntityMoveTo(model, cframe, config.Movement.Speed)
+                EntityMoveTo(model, cframe, config)
                 task.spawn(entity.RunCallback, entity, "OnReachNode", n)
             end
         end
@@ -1620,7 +1685,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
             end
 
             task.spawn(entity.RunCallback, entity, "OnDespawning")
-            EntityMoveTo(model, model:GetPivot() - Vector3.new(0, 300, 0), config.Movement.Speed)
+            EntityMoveToSpeed(model, model:GetPivot() - Vector3.new(0, 300, 0), config.Movement.Speed or CONST.BASE_ENTITY_SPEED)
             entity:Despawn()
         end
     end)
