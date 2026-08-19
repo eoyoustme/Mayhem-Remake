@@ -1043,15 +1043,12 @@ local function GetPathfindNodesAmbush(config: any): { BasePart }
 		for _, room in ipairs(rooms) do
 			local roomNodes = GetNodesFromRoom(room, false, config)
 
+			for _, node in ipairs(roomNodes) do
+				pathfindNodes[#pathfindNodes + 1] = node
+			end
+
 			if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
-				if roomNodes[1] then
-					pathfindNodes[#pathfindNodes + 1] = roomNodes[1]
-				end
 				break
-			else
-				for _, node in ipairs(roomNodes) do
-					pathfindNodes[#pathfindNodes + 1] = node
-				end
 			end
 		end
 	else
@@ -1059,15 +1056,12 @@ local function GetPathfindNodesAmbush(config: any): { BasePart }
 			local room = rooms[i]
 			local roomNodes = GetNodesFromRoom(room, true, config)
 
+			for _, node in ipairs(roomNodes) do
+				pathfindNodes[#pathfindNodes + 1] = node
+			end
+
 			if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
-				if roomNodes[1] then
-					pathfindNodes[#pathfindNodes + 1] = roomNodes[1]
-				end
 				break
-			else
-				for _, node in ipairs(roomNodes) do
-					pathfindNodes[#pathfindNodes + 1] = node
-				end
 			end
 		end
 	end
@@ -1719,15 +1713,9 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 					newRoom:WaitForChild("RoomEntrance", 2)
 					local newNodes = GetNodesFromRoom(newRoom, config.Movement.Reversed, config)
 
-					if config.Movement.EndWhenEnterLatestRoom then
-						if newNodes[1] and not table.find(pathfindNodes, newNodes[1]) then
-							table.insert(pathfindNodes, newNodes[1])
-						end
-					else
-						for _, node in ipairs(newNodes) do
-							if not table.find(pathfindNodes, node) then
-								table.insert(pathfindNodes, node)
-							end
+					for _, node in ipairs(newNodes) do
+						if not table.find(pathfindNodes, node) then
+							table.insert(pathfindNodes, node)
 						end
 					end
 				end)
