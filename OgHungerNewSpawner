@@ -36,7 +36,6 @@ local Remotes = ReplicatedStorage:WaitForChild("RemotesFolder") :: Folder
 local GameStats = ReplicatedStorage:WaitForChild("GameStats") :: Folder
 local CurrentRooms = workspace:WaitForChild("CurrentRooms") :: Folder
 local GameData = ReplicatedStorage:WaitForChild("GameData", 10) :: Folder
-local LatestRoomValue = GameData and GameData:WaitForChild("LatestRoom", 10) :: IntValue
 
 local Assets = {
 	Repentance = LoadCustomInstance(ROOT.."/Assets/Repentance.rbxm"),
@@ -987,43 +986,41 @@ local function DamagePlayer(entity: any)
     end
 end
 
+-- === LẤY NODE TRỰC TIẾP TỪ PHÒNG (KHÔNG CLONE ĐỂ TRÁNH LỖI V.PARENT == NIL) ===
 local function GetNodesFromRoom(room: Model, reversed: boolean, config: any?): { BasePart }
 	local nodes = {}
 	local roomEntrance = room:FindFirstChild("RoomEntrance")
 	if roomEntrance then
-		local n = roomEntrance:Clone()
-		n.Name = "0"
-		n.CFrame -= Vector3.new(0, 3, 0)
-		nodes[1] = n
+		table.insert(nodes, roomEntrance)
 	end
 
 	if not (config and config.Movement and config.Movement.ReboundMoving) then
 		local nodesFolder = room:FindFirstChild("PathfindNodes")
 		if nodesFolder then
-			for _, n in next, nodesFolder:GetChildren() do
-				nodes[#nodes + 1] = n
+			local folderNodes = nodesFolder:GetChildren()
+			table.sort(folderNodes, function(a, b)
+				local numA = tonumber(a.Name) or 0
+				local numB = tonumber(b.Name) or 0
+				return numA < numB
+			end)
+			for _, n in ipairs(folderNodes) do
+				table.insert(nodes, n)
 			end
 		end
 	end
 
 	local roomExit = room:FindFirstChild("RoomExit")
 	if roomExit then
-		local index = #nodes + 1
-		local n = roomExit:Clone()
-		n.Name = tostring(index)
-		n.CFrame -= Vector3.new(0, 3, 0)
-		nodes[index] = n
+		table.insert(nodes, roomExit)
 	end
 
-	table.sort(nodes, function(a: BasePart, b: BasePart)
-        local numA = tonumber(a.Name) or 0
-        local numB = tonumber(b.Name) or 0
-        if reversed then
-            return numA > numB
-        else
-            return numA < numB
-        end
-	end)
+	if reversed then
+		local rev = {}
+		for i = #nodes, 1, -1 do
+			table.insert(rev, nodes[i])
+		end
+		nodes = rev
+	end
 
 	return nodes
 end
@@ -1035,7 +1032,7 @@ local function GetPathfindNodesAmbush(config: any): { BasePart }
 
     if config.Movement.Reversed == false then
         for _, room in ipairs(rooms) do
-            if config.Movement.EndWhenEnterLatestRoom and room == latestRoom then
+            if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
                 break
             end
 
@@ -1047,7 +1044,7 @@ local function GetPathfindNodesAmbush(config: any): { BasePart }
     else
         for i = #rooms, 1, -1 do
             local room = rooms[i]
-            if config.Movement.EndWhenEnterLatestRoom and room == latestRoom then
+            if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
                 continue
             end
 
@@ -1068,7 +1065,7 @@ local function GetPathfindNodesBlitz(config: any): ({BasePart}, {BasePart})
 
     if config.Movement.Reversed == false then
         for _, room in ipairs(rooms) do
-            if config.Movement.EndWhenEnterLatestRoom and room == latestRoom then
+            if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
                 break
             end
 
@@ -1086,7 +1083,7 @@ local function GetPathfindNodesBlitz(config: any): ({BasePart}, {BasePart})
     else
         for i = #rooms, 1, -1 do
             local room = rooms[i]
-            if config.Movement.EndWhenEnterLatestRoom and room == latestRoom then
+            if config.Movement.EndWhenEnterLatestRoom and room == latestRoom and #rooms > 1 then
                 continue
             end
 
@@ -1107,15 +1104,23 @@ local function GetPathfindNodesBlitz(config: any): ({BasePart}, {BasePart})
 end
 
 local function EntityMoveToSpeed(model: Model, cframe: CFrame, speed: number)
+	if not model or not model.Parent then return end
 	local reached = false
-	local connection; connection = RunService.Stepped:Connect(function(_, step)
+	local connection
+	connection = RunService.Stepped:Connect(function(_, step)
+		if not model or not model.Parent then
+			if connection then connection:Disconnect() end
+			reached = true
+			return
+		end
+
 		if not model:GetAttribute("Paused") then
 			local pivot = model:GetPivot()
 			local difference = (cframe.Position - pivot.Position)
-			local unit = difference.Unit
 			local magnitude = difference.Magnitude
 
-			if magnitude > 0.1 then
+			if magnitude > 0.05 then
+				local unit = difference.Unit
 				model:PivotTo(pivot + unit * math.min(step * speed, magnitude))
 			else
 				connection:Disconnect()
@@ -1123,17 +1128,23 @@ local function EntityMoveToSpeed(model: Model, cframe: CFrame, speed: number)
 			end
 		end
 	end)
-	repeat RunService.Stepped:Wait() until reached
+	repeat RunService.Stepped:Wait() until reached or not model or not model.Parent
 end
 
--- === TWEEN DI CHUYỂN BẰNG QUAD INOUT ===
 local function EntityMoveToTween(model: Model, targetCFrame: CFrame, duration: number)
+    if not model or not model.Parent then return end
     local startPivot = model:GetPivot()
     local elapsed = 0
     local connection
     local reached = false
 
     connection = RunService.Stepped:Connect(function(_, step)
+        if not model or not model.Parent then
+            if connection then connection:Disconnect() end
+            reached = true
+            return
+        end
+
         if not model:GetAttribute("Paused") then
             elapsed = elapsed + step
             local alpha = math.clamp(elapsed / math.max(duration, 0.01), 0, 1)
@@ -1147,7 +1158,7 @@ local function EntityMoveToTween(model: Model, targetCFrame: CFrame, duration: n
         end
     end)
 
-    repeat RunService.Stepped:Wait() until reached
+    repeat RunService.Stepped:Wait() until reached or not model or not model.Parent
 end
 
 local function EntityMoveTo(model: Model, cframe: CFrame, config: any)
@@ -1327,7 +1338,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
     model:SetAttribute("Running", true)
     self.ActiveEntities[#self.ActiveEntities + 1] = entity
 
-    -- === XỬ LÝ REBOUND MOVE STYLE (KHI MỞ CỬA SPAWN TẬP) ===
+    -- === XỬ LÝ REBOUND MOVE STYLE ===
     if config.Movement.ReboundMoveStyle and not isReboundRespawn and not model:GetAttribute("ReboundStyleStarted") then
         model:SetAttribute("ReboundStyleStarted", true)
         
@@ -1337,8 +1348,6 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
             local volume = config.Movement.ReboundStyleVolume or 1
             local spawnedCount = 0
 
-            print("[Spawner Debug] Da kich hoat ReboundMoveStyle! Tong so lan spawn khi mo cua:", times)
-
             local connection
             connection = CurrentRooms.ChildAdded:Connect(function(newRoom)
                 if spawnedCount >= times then
@@ -1347,9 +1356,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
                 end
 
                 spawnedCount = spawnedCount + 1
-                print("[Spawner Debug] Nguoi choi mo cua phong moi! Dang spawn lan:", spawnedCount, "/", times)
 
-                -- Phát âm thanh thông báo
                 if soundId and soundId ~= "" and soundId ~= "rbxassetid://" and soundId ~= "rbxassetid://0" then
                     local sound = Instance.new("Sound")
                     sound.SoundId = soundId
@@ -1359,14 +1366,11 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
                     Debris:AddItem(sound, 5)
                 end
 
-                -- Tạo Entity mới để spawn
                 task.delay(0.2, function()
                     local newEntity = Module:Create(config)
                     if newEntity then
                         newEntity.Debug = CloneTable(entity.Debug)
-                        Module:Run(newEntity, false, true) -- Chuyển true vào isReboundRespawn
-                    else
-                        warn("[Spawner Debug] Khong the tao newEntity!")
+                        Module:Run(newEntity, false, true)
                     end
                 end)
             end)
@@ -1395,7 +1399,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
     model.Parent = workspace
     task.spawn(entity.RunCallback, entity, "OnSpawned")
 
-    -- CHỈ ĐỔI MÀU Ở LẦN SPAWN ĐẦU
+    -- ĐỔI MÀU Ở LẦN SPAWN ĐẦU
     if not isReboundRespawn and config.Spawned and config.Spawned.ChangeColorWhenSpawn then
         task.spawn(function()
             local colorCorrection = Lighting:FindFirstChild("MainColorCorrection")
@@ -1443,7 +1447,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
         end)
     end
 
-    -- CHỈ CHỚP ĐÈN LẦN ĐẦU
+    -- CHỚP ĐÈN LẦN ĐẦU
     local currentRoom = GetCurrentRoom(false)
     if not isReboundRespawn and currentRoom then
         if config.Lights.Flicker.Enabled then
@@ -1592,28 +1596,21 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
         if reboundType == "AMBUSH" then
             local pathfindNodes = GetPathfindNodesAmbush(config)
 
-            -- === BẮT SỰ KIỆN KHI CÓ PHÒNG MỚI ĐƯỢC TẠO DÙNG LatestRoom.Changed ===
-            local newRoomConnection
-            if LatestRoomValue then
-                newRoomConnection = LatestRoomValue.Changed:Connect(function(roomVal)
-                    if not entity:IsAlive() or model:GetAttribute("Despawning") then
-                        if newRoomConnection then newRoomConnection:Disconnect() end
-                        return
-                    end
-
-                    local newRoom = CurrentRooms:FindFirstChild(tostring(roomVal)) or GetCurrentRoom(true)
-                    if newRoom then
-                        local newNodes = GetNodesFromRoom(newRoom, config.Movement.Reversed, config)
-                        for _, node in ipairs(newNodes) do
-                            if not table.find(pathfindNodes, node) then
-                                table.insert(pathfindNodes, node)
-                            end
+            -- === LẮNG NGHE SỰ KIỆN TẠO PHÒNG MỚI ĐỂ CẬP NHẬT NODE NGAY LẬP TỨC ===
+            local roomAddedConn
+            roomAddedConn = CurrentRooms.ChildAdded:Connect(function(newRoom)
+                task.spawn(function()
+                    newRoom:WaitForChild("RoomEntrance", 2)
+                    local newNodes = GetNodesFromRoom(newRoom, config.Movement.Reversed, config)
+                    for _, node in ipairs(newNodes) do
+                        if not table.find(pathfindNodes, node) then
+                            table.insert(pathfindNodes, node)
                         end
                     end
                 end)
-            end
+            end)
 
-            -- Dùng vòng lặp while động để chạy theo số lượng nodes tăng thêm khi mở phòng mới
+            -- Chạy theo số lượng Nodes (Tự cập nhật liên tục khi danh sách tăng thêm)
             local nodeIndex = 1
             while nodeIndex <= #pathfindNodes and entity:IsAlive() do
                 local v = pathfindNodes[nodeIndex]
@@ -1625,10 +1622,6 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
                 nodeIndex = nodeIndex + 1
             end
 
-            if newRoomConnection then
-                newRoomConnection:Disconnect()
-            end
-            
             if config.Rebounding.Enabled then
                 local reboundsCount = math.random(config.Rebounding.Min, config.Rebounding.Max)
                 for i = 1, reboundsCount do
@@ -1636,17 +1629,22 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
                     model:SetAttribute("Damage", true)
                     task.spawn(entity.RunCallback, entity, "OnRebounding", true)
 
+                    -- Quay về
                     for j = #pathfindNodes, 1, -1 do
                         local v = pathfindNodes[j]
-                        local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                        EntityMoveTo(model, cframe, config)
-                        task.spawn(entity.RunCallback, entity, "OnReachNode", v)
+                        if v and v.Parent then
+                            local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+                            EntityMoveTo(model, cframe, config)
+                            task.spawn(entity.RunCallback, entity, "OnReachNode", v)
+                        end
                     end
 
                     task.spawn(entity.RunCallback, entity, "OnRebounding", false)
                     task.wait(config.Rebounding.Delay)
                     model:SetAttribute("Damage", true)
                     task.spawn(entity.RunCallback, entity, "OnRebounding", true)
+                    
+                    -- Cập nhật danh sách Node mới nhất trước khi chạy tới tiếp
                     pathfindNodes = GetPathfindNodesAmbush(config)
 
                     local reIndex = 1
@@ -1667,13 +1665,20 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
                     end
                 end
             end
+
+            if roomAddedConn then
+                roomAddedConn:Disconnect()
+            end
+
         elseif reboundType == "BLITZ" then
             local nodesToCurrent, _ = GetPathfindNodesBlitz(config)
 	
             for _, n in next, nodesToCurrent do
-                local cframe = n.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                EntityMoveTo(model, cframe, config)
-                task.spawn(entity.RunCallback, entity, "OnReachNode", n)
+                if n and n.Parent then
+                    local cframe = n.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+                    EntityMoveTo(model, cframe, config)
+                    task.spawn(entity.RunCallback, entity, "OnReachNode", n)
+                end
             end
             
             if config.Rebounding.Enabled then
@@ -1704,11 +1709,14 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
                     model:SetAttribute("Damage", true)
                     task.spawn(entity.RunCallback, entity, "OnRebounding", true)
                     
-                    local nodeIndex = tonumber(randomNode.Name)
+                    local nodeIndex = tonumber(randomNode.Name) or 1
                     for i = #roomNodes, nodeIndex, -1 do
-                        local cframe = roomNodes[math.clamp(i, 1, #roomNodes)].CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                        EntityMoveTo(model, cframe, config)
-                        task.spawn(entity.RunCallback, entity, "OnReachNode", roomNodes[i])
+                        local targetNode = roomNodes[math.clamp(i, 1, #roomNodes)]
+                        if targetNode and targetNode.Parent then
+                            local cframe = targetNode.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+                            EntityMoveTo(model, cframe, config)
+                            task.spawn(entity.RunCallback, entity, "OnReachNode", targetNode)
+                        end
                     end
                     
                     task.wait(config.Rebounding.Delay)
@@ -1716,18 +1724,23 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
                     task.spawn(entity.RunCallback, entity, "OnRebounding", false)
 
                     for i = nodeIndex, #roomNodes do
-                        local cframe = roomNodes[math.clamp(i, 1, #roomNodes)].CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                        EntityMoveTo(model, cframe, config)
-                        task.spawn(entity.RunCallback, entity, "OnReachNode", roomNodes[i])
+                        local targetNode = roomNodes[math.clamp(i, 1, #roomNodes)]
+                        if targetNode and targetNode.Parent then
+                            local cframe = targetNode.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+                            EntityMoveTo(model, cframe, config)
+                            task.spawn(entity.RunCallback, entity, "OnReachNode", targetNode)
+                        end
                     end
                 end
             end
             
             local _, updatedToEnd = GetPathfindNodesBlitz(config)
             for _, n in next, updatedToEnd do
-                local cframe = n.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-                EntityMoveTo(model, cframe, config)
-                task.spawn(entity.RunCallback, entity, "OnReachNode", n)
+                if n and n.Parent then
+                    local cframe = n.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+                    EntityMoveTo(model, cframe, config)
+                    task.spawn(entity.RunCallback, entity, "OnReachNode", n)
+                end
             end
         end
 
