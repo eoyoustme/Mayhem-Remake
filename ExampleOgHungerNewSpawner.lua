@@ -11,7 +11,7 @@ end
 local entity = Spawner:Create({
 	Entity = {
 		Name = "Template Entity",
-		Asset = "https://github.com/RegularVynixu/DOORS-Entity-Spawner-V2/raw/main/Assets/Entities/Rush.rbxmrbxassetid://14123633468",
+		Asset = "https://github.com/RegularVynixu/DOORS-Entity-Spawner-V2/raw/main/Assets/Entities/Rush.rbxm",
 		HeightOffset = 0
 	},
 	Lights = {
