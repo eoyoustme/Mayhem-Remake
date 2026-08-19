@@ -90,6 +90,7 @@ local CONST = {
 				ReboundStyleTimes = 1,
 				ReboundStyleSound = "rbxassetid://0",
 				ReboundStyleVolume = 1,
+				ReboundStyleDelay = 2,
 				ChasePlayerWhenSee = false,
 				SpeedWhenChase = 7.5
 			},
@@ -997,7 +998,6 @@ end
 local function GetNodesFromRoom(room: Model, reversed: boolean, config: any?): { BasePart }
 	local nodes = {}
 
-	-- Ð?m b?o ch? RoomEntrance và RoomExit load d?y d?
 	local roomEntrance = room:FindFirstChild("RoomEntrance") or room:WaitForChild("RoomEntrance", 2)
 	if roomEntrance then
 		table.insert(nodes, roomEntrance)
@@ -1033,7 +1033,6 @@ local function GetNodesFromRoom(room: Model, reversed: boolean, config: any?): {
 
 	return nodes
 end
-
 
 local function GetPathfindNodesAmbush(config: any): { BasePart }
 	local pathfindNodes = {}
@@ -1138,6 +1137,12 @@ local function EntityMoveToSpeed(model: Model, cframe: CFrame, speedInput: any)
 			return
 		end
 
+		if model:GetAttribute("IsChasing") then
+			if connection then connection:Disconnect() end
+			reached = true
+			return
+		end
+
 		if not model:GetAttribute("Paused") then
 			local speed = typeof(speedInput) == "function" and speedInput() or speedInput or CONST.BASE_ENTITY_SPEED
 			local pivot = model:GetPivot()
@@ -1153,7 +1158,7 @@ local function EntityMoveToSpeed(model: Model, cframe: CFrame, speedInput: any)
 			end
 		end
 	end)
-	repeat RunService.Stepped:Wait() until reached or not model or not model.Parent
+	repeat RunService.Stepped:Wait() until reached or not model or not model.Parent or model:GetAttribute("IsChasing")
 end
 
 local function EntityMoveToTween(model: Model, targetCFrame: CFrame, duration: number)
@@ -1165,6 +1170,12 @@ local function EntityMoveToTween(model: Model, targetCFrame: CFrame, duration: n
 
 	connection = RunService.Stepped:Connect(function(_, step)
 		if not model or not model.Parent then
+			if connection then connection:Disconnect() end
+			reached = true
+			return
+		end
+
+		if model:GetAttribute("IsChasing") then
 			if connection then connection:Disconnect() end
 			reached = true
 			return
@@ -1183,7 +1194,7 @@ local function EntityMoveToTween(model: Model, targetCFrame: CFrame, duration: n
 		end
 	end)
 
-	repeat RunService.Stepped:Wait() until reached or not model or not model.Parent
+	repeat RunService.Stepped:Wait() until reached or not model or not model.Parent or model:GetAttribute("IsChasing")
 end
 
 local function EntityMoveTo(model: Model, cframe: CFrame, config: any)
@@ -1486,7 +1497,11 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 		end
 	end
 
-	task.wait(config.Movement.Delay)
+	local startDelay = config.Movement.Delay
+	if config.Movement.ReboundMoveStyle and (isReboundRespawn or model:GetAttribute("ReboundStyleStarted")) then
+		startDelay = config.Movement.ReboundStyleDelay or config.Movement.Delay
+	end
+	task.wait(startDelay)
 
 	task.spawn(entity.RunCallback, entity, "OnStartMoving")
 	task.spawn(function()
@@ -1703,9 +1718,12 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 				end)
 			end)
 
-			-- Lu?t di ban d?u
 			local nodeIndex = 1
 			while nodeIndex <= #pathfindNodes and entity:IsAlive() do
+				if model:GetAttribute("IsChasing") then
+					repeat task.wait(0.1) until not entity:IsAlive() or not model:GetAttribute("IsChasing")
+					break
+				end
 				local v = pathfindNodes[nodeIndex]
 				if v and v.Parent then
 					local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
@@ -1715,16 +1733,16 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 				nodeIndex = nodeIndex + 1
 			end
 
-			-- Lu?t Rebounding
-			if config.Rebounding.Enabled then
+			if config.Rebounding.Enabled and not model:GetAttribute("IsChasing") then
 				local reboundsCount = math.random(config.Rebounding.Min, config.Rebounding.Max)
 				for i = 1, reboundsCount do
+					if model:GetAttribute("IsChasing") then break end
 					task.wait(config.Rebounding.Delay)
 					model:SetAttribute("Damage", true)
 					task.spawn(entity.RunCallback, entity, "OnRebounding", true)
 
-					-- Ch?y lùi v?
 					for j = #pathfindNodes, 1, -1 do
+						if model:GetAttribute("IsChasing") then break end
 						local v = pathfindNodes[j]
 						if v and v.Parent then
 							local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
@@ -1733,6 +1751,8 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 						end
 					end
 
+					if model:GetAttribute("IsChasing") then break end
+
 					task.spawn(entity.RunCallback, entity, "OnRebounding", false)
 					task.wait(config.Rebounding.Delay)
 					model:SetAttribute("Damage", true)
@@ -1740,9 +1760,9 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 					pathfindNodes = GetPathfindNodesAmbush(config)
 
-					-- Ch?y ti?n lên (Ðã s?a v.Cframe thành v.CFrame)
 					local reIndex = 1
 					while reIndex <= #pathfindNodes and entity:IsAlive() do
+						if model:GetAttribute("IsChasing") then break end
 						local v = pathfindNodes[reIndex]
 						if v and v.Parent then
 							local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
@@ -1768,6 +1788,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 			local nodesToCurrent, _ = GetPathfindNodesBlitz(config)
 
 			for _, n in next, nodesToCurrent do
+				if model:GetAttribute("IsChasing") then break end
 				if n and n.Parent then
 					local cframe = n.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
 					EntityMoveTo(model, cframe, config)
@@ -1775,7 +1796,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 				end
 			end
 
-			if config.Rebounding.Enabled then
+			if config.Rebounding.Enabled and not model:GetAttribute("IsChasing") then
 				local currentRoom = GetCurrentRoom(false)
 				if currentRoom then
 					local roomNodes = GetNodesFromRoom(currentRoom, config.Movement.Reversed, config)
@@ -1786,11 +1807,13 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 						if randomNode then
 							for _ = 1, math.random(config.Rebounding.Min, config.Rebounding.Max) do
+								if model:GetAttribute("IsChasing") then break end
 								model:SetAttribute("Damage", true)
 								task.spawn(entity.RunCallback, entity, "OnRebounding", true)
 
 								local nodeIndex = tonumber(randomNode.Name) or 1
 								for i = #roomNodes, nodeIndex, -1 do
+									if model:GetAttribute("IsChasing") then break end
 									local targetNode = roomNodes[math.clamp(i, 1, #roomNodes)]
 									if targetNode and targetNode.Parent then
 										local cframe = targetNode.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
@@ -1804,6 +1827,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 								task.spawn(entity.RunCallback, entity, "OnRebounding", false)
 
 								for i = nodeIndex, #roomNodes do
+									if model:GetAttribute("IsChasing") then break end
 									local targetNode = roomNodes[math.clamp(i, 1, #roomNodes)]
 									if targetNode and targetNode.Parent then
 										local cframe = targetNode.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
@@ -1817,17 +1841,23 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 				end
 			end
 
-			local _, updatedToEnd = GetPathfindNodesBlitz(config)
-			for _, n in next, updatedToEnd do
-				if n and n.Parent then
-					local cframe = n.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
-					EntityMoveTo(model, cframe, config)
-					task.spawn(entity.RunCallback, entity, "OnReachNode", n)
+			if not model:GetAttribute("IsChasing") then
+				local _, updatedToEnd = GetPathfindNodesBlitz(config)
+				for _, n in next, updatedToEnd do
+					if model:GetAttribute("IsChasing") then break end
+					if n and n.Parent then
+						local cframe = n.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+						EntityMoveTo(model, cframe, config)
+						task.spawn(entity.RunCallback, entity, "OnReachNode", n)
+					end
 				end
 			end
 		end
 
-		-- Kích ho?t Despawn sau khi ch?y xong Rebound
+		if model:GetAttribute("IsChasing") then
+			repeat task.wait(0.2) until not entity:IsAlive()
+		end
+
 		if entity:IsAlive() and not model:GetAttribute("Despawning") then
 			model:SetAttribute("Despawning", true)
 
