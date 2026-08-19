@@ -80,7 +80,8 @@ local CONST = {
 				Speed = 100,
 				Delay = 2,
 				Reversed = false,
-				EndWhenEnterLatestRoom = false
+				EndWhenEnterLatestRoom = false,
+				EndDelay = 0
 			},
 			Damage = {
 				Enabled = true,
@@ -156,6 +157,7 @@ local CONST = {
 			OnDespawning = function() end,
 			OnDespawned = function() end,
 			OnDamagePlayer = function() end,
+			EndWhenGO = function() end,
 			CrucifixionOverwrite = nil
 		}
 	}
@@ -820,7 +822,6 @@ local function GetPathfindNodesAmbush(config: any): { BasePart }
 
     if config.Movement.Reversed == false then
         for _, room in ipairs(rooms) do
-            -- Dừng trước khi lấy Node của LatestRoom nếu EndWhenEnterLatestRoom = true
             if config.Movement.EndWhenEnterLatestRoom and room == latestRoom then
                 break
             end
@@ -833,8 +834,9 @@ local function GetPathfindNodesAmbush(config: any): { BasePart }
     else
         for i = #rooms, 1, -1 do
             local room = rooms[i]
+            -- Nếu Reversed = true và EndWhenEnterLatestRoom = true, dùng continue để bỏ qua phong mới nhất mà không ngắt vòng lặp
             if config.Movement.EndWhenEnterLatestRoom and room == latestRoom then
-                break
+                continue
             end
 
             local roomNodes = GetNodesFromRoom(room, true)
@@ -873,7 +875,7 @@ local function GetPathfindNodesBlitz(config: any): ({BasePart}, {BasePart})
         for i = #rooms, 1, -1 do
             local room = rooms[i]
             if config.Movement.EndWhenEnterLatestRoom and room == latestRoom then
-                break
+                continue
             end
 
             local roomNodes = GetNodesFromRoom(room, true)
@@ -1002,9 +1004,9 @@ Module.Create = function(self, config: any): any?
         Config = newConfig,
         Debug = CloneTable(CONST.DEFAULT.DEBUG),
         SetCallback = function(self, key: string, callback: any)
-            assert(typeof(key) == "string" and self.Debug[key], debug.traceback("Callback key is invalid."))
+            assert(typeof(key) == "string" and self.Debug[key] ~= nil, debug.traceback("Callback key is invalid."))
             assert(typeof(callback) == "function", debug.traceback("Callback must be a function."))
-            if self.Debug[key] then
+            if self.Debug[key] ~= nil then
                 self.Debug[key] = callback
             end
         end,
@@ -1091,8 +1093,13 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
     local spawnPoint: BasePart? = nil
     do
         local rooms = GetSortedRooms()
+        local latestRoom = GetCurrentRoom(true)
         if config.Movement.Reversed then
-            spawnPoint = rooms[#rooms]:FindFirstChild("RoomExit")
+            local targetRoom = rooms[#rooms]
+            if config.Movement.EndWhenEnterLatestRoom and targetRoom == latestRoom and #rooms > 1 then
+                targetRoom = rooms[#rooms - 1]
+            end
+            spawnPoint = targetRoom:FindFirstChild("RoomExit") or targetRoom:FindFirstChild("RoomEntrance")
         else
             spawnPoint = rooms[1]:FindFirstChild("RoomEntrance")
         end
@@ -1416,6 +1423,15 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
         -- Despawning
         if not model:GetAttribute("Despawning") then
             model:SetAttribute("Despawning", true)
+
+            -- Xử lý EndWhenEnterLatestRoom: Gọi callback EndWhenGO và chờ EndDelay
+            if config.Movement.EndWhenEnterLatestRoom then
+                task.spawn(entity.RunCallback, entity, "EndWhenGO")
+                if config.Movement.EndDelay and config.Movement.EndDelay > 0 then
+                    task.wait(config.Movement.EndDelay)
+                end
+            end
+
             task.spawn(entity.RunCallback, entity, "OnDespawning")
             EntityMoveTo(model, model:GetPivot() - Vector3.new(0, 300, 0), config.Movement.Speed)
             entity:Despawn()
