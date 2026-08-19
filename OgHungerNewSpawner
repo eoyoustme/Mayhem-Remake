@@ -1126,7 +1126,7 @@ local function EntityMoveToSpeed(model: Model, cframe: CFrame, speed: number)
 	repeat RunService.Stepped:Wait() until reached
 end
 
--- === CẬP NHẬT: TWEEN MOVE TRỰC TIẾP DÙNG QUAD INOUT ===
+-- === TWEEN DI CHUYỂN BẰNG QUAD INOUT ===
 local function EntityMoveToTween(model: Model, targetCFrame: CFrame, duration: number)
     local startPivot = model:GetPivot()
     local elapsed = 0
@@ -1137,7 +1137,6 @@ local function EntityMoveToTween(model: Model, targetCFrame: CFrame, duration: n
         if not model:GetAttribute("Paused") then
             elapsed = elapsed + step
             local alpha = math.clamp(elapsed / math.max(duration, 0.01), 0, 1)
-            -- Áp dụng Quad InOut Easing Style
             local quadAlpha = TweenService:GetValue(alpha, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
             model:PivotTo(startPivot:Lerp(targetCFrame, quadAlpha))
 
@@ -1328,45 +1327,49 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
     model:SetAttribute("Running", true)
     self.ActiveEntities[#self.ActiveEntities + 1] = entity
 
-    -- === CẬP NHẬT: SỬA LỖI REBOUND MOVE STYLE KHÔNG SPAWN KHI MỞ CỬA ===
-    if config.Movement.ReboundMoveStyle and not model:GetAttribute("ReboundStyleStarted") then
+    -- === XỬ LÝ REBOUND MOVE STYLE (KHI MỞ CỬA SPAWN TẾP) ===
+    if config.Movement.ReboundMoveStyle and not isReboundRespawn and not model:GetAttribute("ReboundStyleStarted") then
         model:SetAttribute("ReboundStyleStarted", true)
         
         task.spawn(function()
             local times = math.clamp(tonumber(config.Movement.ReboundStyleTimes) or 1, 1, 7)
             local soundId = config.Movement.ReboundStyleSound
             local volume = config.Movement.ReboundStyleVolume or 1
+            local spawnedCount = 0
 
-            local gameData = ReplicatedStorage:FindFirstChild("GameData") or ReplicatedStorage:FindFirstChild("GameStats")
-            local latestRoomVal = gameData and gameData:FindFirstChild("LatestRoom")
+            print("[Spawner Debug] Da kich hoat ReboundMoveStyle! Tong so lan spawn khi mo cua:", times)
 
-            if latestRoomVal then
-                local count = 0
-                local connection
-                connection = latestRoomVal.Changed:Connect(function()
-                    if count >= times then
-                        connection:Disconnect()
-                        return
-                    end
-                    count = count + 1
+            local connection
+            connection = CurrentRooms.ChildAdded:Connect(function(newRoom)
+                if spawnedCount >= times then
+                    if connection then connection:Disconnect() end
+                    return
+                end
 
-                    if soundId and soundId ~= "" and soundId ~= "rbxassetid://" then
-                        local sound = Instance.new("Sound")
-                        sound.SoundId = soundId
-                        sound.Volume = volume
-                        sound.Parent = workspace
-                        sound:Play()
-                        Debris:AddItem(sound, 5)
-                    end
+                spawnedCount = spawnedCount + 1
+                print("[Spawner Debug] Nguoi choi mo cua phong moi! Dang spawn lan:", spawnedCount, "/", times)
 
-                    -- Tạo bản thể Entity mới hoàn toàn từ config để spawn tiếp khi mở cửa
+                -- Phát âm thanh thông báo
+                if soundId and soundId ~= "" and soundId ~= "rbxassetid://" and soundId ~= "rbxassetid://0" then
+                    local sound = Instance.new("Sound")
+                    sound.SoundId = soundId
+                    sound.Volume = volume
+                    sound.Parent = workspace
+                    sound:Play()
+                    Debris:AddItem(sound, 5)
+                end
+
+                -- Tạo Entity mới để spawn
+                task.delay(0.2, function()
                     local newEntity = Module:Create(config)
                     if newEntity then
                         newEntity.Debug = CloneTable(entity.Debug)
-                        Module:Run(newEntity, false, true)
+                        Module:Run(newEntity, false, true) -- Chuyền true vào isReboundRespawn
+                    else
+                        warn("[Spawner Debug] Khong the tao newEntity!")
                     end
                 end)
-            end
+            end)
         end)
     end
 
@@ -1392,7 +1395,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
     model.Parent = workspace
     task.spawn(entity.RunCallback, entity, "OnSpawned")
 
-    -- CHỈ ĐỔI MÀU/RAINBOW Ở LẦN SPAWN ĐẦU TIÊN (Bỏ qua khi ReboundRespawn)
+    -- CHỈ ĐỔI MÀU Ở LẦN SPAWN ĐẦU
     if not isReboundRespawn and config.Spawned and config.Spawned.ChangeColorWhenSpawn then
         task.spawn(function()
             local colorCorrection = Lighting:FindFirstChild("MainColorCorrection")
@@ -1440,7 +1443,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
         end)
     end
 
-    -- BỎ QUA FLICKER & EARTHQUAKE KHI LÀ LẦN REBOUND RESPAWN
+    -- CHỈ CHỚP ĐÈN LẦN ĐẦU
     local currentRoom = GetCurrentRoom(false)
     if not isReboundRespawn and currentRoom then
         if config.Lights.Flicker.Enabled then
