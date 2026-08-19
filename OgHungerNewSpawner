@@ -987,7 +987,8 @@ local function DamagePlayer(entity: any)
     end
 end
 
-local function GetNodesFromRoom(room: Model, reversed: boolean): { BasePart }
+-- === CẬP NHẬT: Xử lý ReboundMoving (Bỏ qua PathfindNodes nếu ReboundMoving = true) ===
+local function GetNodesFromRoom(room: Model, reversed: boolean, config: any?): { BasePart }
 	local nodes = {}
 	local roomEntrance = room:FindFirstChild("RoomEntrance")
 	if roomEntrance then
@@ -997,10 +998,13 @@ local function GetNodesFromRoom(room: Model, reversed: boolean): { BasePart }
 		nodes[1] = n
 	end
 
-	local nodesFolder = room:FindFirstChild("PathfindNodes")
-	if nodesFolder then
-		for _, n in next, nodesFolder:GetChildren() do
-			nodes[#nodes + 1] = n
+	-- Nếu ReboundMoving = true thì BỎ QUA PathfindNodes, chỉ đi thẳng từ RoomEntrance -> RoomExit
+	if not (config and config.Movement and config.Movement.ReboundMoving) then
+		local nodesFolder = room:FindFirstChild("PathfindNodes")
+		if nodesFolder then
+			for _, n in next, nodesFolder:GetChildren() do
+				nodes[#nodes + 1] = n
+			end
 		end
 	end
 
@@ -1037,7 +1041,7 @@ local function GetPathfindNodesAmbush(config: any): { BasePart }
                 break
             end
 
-            local roomNodes = GetNodesFromRoom(room, false)
+            local roomNodes = GetNodesFromRoom(room, false, config)
             for _, node in ipairs(roomNodes) do
                 pathfindNodes[#pathfindNodes + 1] = node
             end
@@ -1049,7 +1053,7 @@ local function GetPathfindNodesAmbush(config: any): { BasePart }
                 continue
             end
 
-            local roomNodes = GetNodesFromRoom(room, true)
+            local roomNodes = GetNodesFromRoom(room, true, config)
             for _, node in ipairs(roomNodes) do
                 pathfindNodes[#pathfindNodes + 1] = node
             end
@@ -1070,7 +1074,7 @@ local function GetPathfindNodesBlitz(config: any): ({BasePart}, {BasePart})
                 break
             end
 
-            local roomNodes = GetNodesFromRoom(room, false)
+            local roomNodes = GetNodesFromRoom(room, false, config)
             local roomIndex = tonumber(room.Name) or 0
     
             for _, node in ipairs(roomNodes) do
@@ -1088,7 +1092,7 @@ local function GetPathfindNodesBlitz(config: any): ({BasePart}, {BasePart})
                 continue
             end
 
-            local roomNodes = GetNodesFromRoom(room, true)
+            local roomNodes = GetNodesFromRoom(room, true, config)
             local roomIndex = tonumber(room.Name) or 0
     
             for _, node in ipairs(roomNodes) do
@@ -1291,9 +1295,10 @@ Module.Create = function(self, config: any): any?
     }
 end
 
-Module.Run = function(self, entity: any, copyEntity: boolean)
+-- === CẬP NHẬT: Thêm cờ isReboundRespawn để phân biệt lần Spawn do ReboundMoveStyle ===
+Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: boolean?)
     if copyEntity == true then
-        self:Run(CloneTable(entity), false)
+        self:Run(CloneTable(entity), false, isReboundRespawn)
         return
     end
 
@@ -1323,7 +1328,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
     model:SetAttribute("Running", true)
     self.ActiveEntities[#self.ActiveEntities + 1] = entity
 
-    -- === XỬ LÝ REBOUND MOVE STYLE (LẮNG NGHE LATESTROOM) ===
+    -- === XỬ LÝ REBOUND MOVE STYLE (LẮNG NGHE LATESTROOM BẰNG CƠ CHẾ MỚI) ===
     if config.Movement.ReboundMoveStyle and not model:GetAttribute("ReboundStyleStarted") then
         model:SetAttribute("ReboundStyleStarted", true)
         
@@ -1332,7 +1337,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
             local soundId = config.Movement.ReboundStyleSound
             local volume = config.Movement.ReboundStyleVolume or 1
 
-            local gameData = ReplicatedStorage:FindFirstChild("GameData")
+            local gameData = ReplicatedStorage:FindFirstChild("GameData") or ReplicatedStorage:FindFirstChild("GameStats")
             local latestRoomVal = gameData and gameData:FindFirstChild("LatestRoom")
 
             if latestRoomVal then
@@ -1348,7 +1353,8 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
                         Debris:AddItem(sound, 5)
                     end
 
-                    Module:Run(entity, true)
+                    -- Chạy lại Entity nhưng đánh dấu isReboundRespawn = true (Để BỎ QUA hiệu ứng Spawned)
+                    Module:Run(entity, true, true)
                 end
             end
         end)
@@ -1376,7 +1382,8 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
     model.Parent = workspace
     task.spawn(entity.RunCallback, entity, "OnSpawned")
 
-    if config.Spawned and config.Spawned.ChangeColorWhenSpawn then
+    -- === CẬP NHẬT: CHỈ ĐỔI MÀU/RAINBOW Ở LẦN SPAWN ĐẦU TIÊN (Bỏ qua khi ReboundRespawn) ===
+    if not isReboundRespawn and config.Spawned and config.Spawned.ChangeColorWhenSpawn then
         task.spawn(function()
             local colorCorrection = Lighting:FindFirstChild("MainColorCorrection")
             if not colorCorrection then
@@ -1423,8 +1430,9 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
         end)
     end
 
+    -- === CẬP NHẬT: BỎ QUA FLICKER & EARTHQUAKE KHI LÀ LẦN REBOUND RESPAWN ===
     local currentRoom = GetCurrentRoom(false)
-    if currentRoom then
+    if not isReboundRespawn and currentRoom then
         if config.Lights.Flicker.Enabled then
             Modules.Module_Events.flicker(currentRoom, config.Lights.Flicker.Duration)
         end
@@ -1626,7 +1634,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean)
                     return
                 end
 
-                local roomNodes = GetNodesFromRoom(currentRoom, config.Movement.Reversed)
+                local roomNodes = GetNodesFromRoom(currentRoom, config.Movement.Reversed, config)
                 if #roomNodes == 1 then
                     warn(debug.traceback("Failed to obtain current room."))
                     return
