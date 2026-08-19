@@ -78,6 +78,8 @@ local CONST = {
 			},
 			Movement = {
 				Speed = 100,
+				SpeedFast = 370,
+				MoveFastNotEnter = false,
 				Delay = 2,
 				Reversed = false,
 				EndWhenEnterLatestRoom = false,
@@ -91,6 +93,7 @@ local CONST = {
 			},
 			Damage = {
 				Enabled = true,
+				KillOnMove = false,
 				Range = 40,
 				Amount = 125,
 				IgnoreHiding = false,
@@ -986,7 +989,6 @@ local function DamagePlayer(entity: any)
     end
 end
 
--- === LẤY NODE TRỰC TIẾP TỪ PHÒNG (KHÔNG CLONE ĐỂ TRÁNH LỖI V.PARENT == NIL) ===
 local function GetNodesFromRoom(room: Model, reversed: boolean, config: any?): { BasePart }
 	local nodes = {}
 	local roomEntrance = room:FindFirstChild("RoomEntrance")
@@ -1103,7 +1105,21 @@ local function GetPathfindNodesBlitz(config: any): ({BasePart}, {BasePart})
 	return nodesToCurrent, nodesToEnd
 end
 
-local function EntityMoveToSpeed(model: Model, cframe: CFrame, speed: number)
+local function GetCurrentSpeed(model: Model, config: any): number
+    if config.Movement and config.Movement.MoveFastNotEnter then
+        local latestRoom = GetCurrentRoom(true)
+        if latestRoom then
+            local latestNum = tonumber(latestRoom.Name) or 0
+            local currentNum = model:GetAttribute("LastEnteredRoom") or -1
+            if currentNum < latestNum then
+                return config.Movement.SpeedFast or (CONST.BASE_ENTITY_SPEED / 100 * 370)
+            end
+        end
+    end
+    return config.Movement.Speed or CONST.BASE_ENTITY_SPEED
+end
+
+local function EntityMoveToSpeed(model: Model, cframe: CFrame, speedInput: any)
 	if not model or not model.Parent then return end
 	local reached = false
 	local connection
@@ -1115,6 +1131,7 @@ local function EntityMoveToSpeed(model: Model, cframe: CFrame, speed: number)
 		end
 
 		if not model:GetAttribute("Paused") then
+			local speed = typeof(speedInput) == "function" and speedInput() or speedInput or CONST.BASE_ENTITY_SPEED
 			local pivot = model:GetPivot()
 			local difference = (cframe.Position - pivot.Position)
 			local magnitude = difference.Magnitude
@@ -1165,7 +1182,9 @@ local function EntityMoveTo(model: Model, cframe: CFrame, config: any)
     if config.Movement and config.Movement.ReboundMoving then
         EntityMoveToTween(model, cframe, config.Movement.TweenSecond or 1)
     else
-        EntityMoveToSpeed(model, cframe, config.Movement.Speed or CONST.BASE_ENTITY_SPEED)
+        EntityMoveToSpeed(model, cframe, function()
+            return GetCurrentSpeed(model, config)
+        end)
     end
 end
 
@@ -1207,6 +1226,9 @@ LocalPlayer.CharacterAdded:Connect(OnCharacterAdded)
 Module.Create = function(self, config: any): any?
     local newConfig = ApplyConfigDefaults(config, CONST.DEFAULT.CONFIG)
     newConfig.Movement.Speed = CONST.BASE_ENTITY_SPEED / 100 * config.Movement.Speed
+    if config.Movement and config.Movement.SpeedFast then
+        newConfig.Movement.SpeedFast = CONST.BASE_ENTITY_SPEED / 100 * config.Movement.SpeedFast
+    end
 
     local asset = newConfig.Entity.Asset
     local success, entityModel = false, nil
@@ -1338,7 +1360,6 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
     model:SetAttribute("Running", true)
     self.ActiveEntities[#self.ActiveEntities + 1] = entity
 
-    -- === XỬ LÝ REBOUND MOVE STYLE ===
     if config.Movement.ReboundMoveStyle and not isReboundRespawn and not model:GetAttribute("ReboundStyleStarted") then
         model:SetAttribute("ReboundStyleStarted", true)
         
@@ -1399,7 +1420,6 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
     model.Parent = workspace
     task.spawn(entity.RunCallback, entity, "OnSpawned")
 
-    -- ĐỔI MÀU Ở LẦN SPAWN ĐẦU
     if not isReboundRespawn and config.Spawned and config.Spawned.ChangeColorWhenSpawn then
         task.spawn(function()
             local colorCorrection = Lighting:FindFirstChild("MainColorCorrection")
@@ -1447,7 +1467,6 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
         end)
     end
 
-    -- CHỚP ĐÈN LẦN ĐẦU
     local currentRoom = GetCurrentRoom(false)
     if not isReboundRespawn and currentRoom then
         if config.Lights.Flicker.Enabled then
@@ -1562,12 +1581,23 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
                     and (charOrigin - origin).Magnitude <= damage.Range
                     and inSight
                 then
-                    model:SetAttribute("Damage", false)
+                    local isMoving = (Humanoid.MoveDirection.Magnitude > 0) or ((RootPart.AssemblyLinearVelocity * Vector3.new(1, 0, 1)).Magnitude > 0.5)
+                    local shouldDamage = true
 
-                    if ripper and ripper.Enabled == true then
-                        PlayRipperJumpscare(entity)
-                    else
-                        DamagePlayer(entity)
+                    if damage.KillOnMove then
+                        if not isMoving then
+                            shouldDamage = false
+                        end
+                    end
+
+                    if shouldDamage then
+                        model:SetAttribute("Damage", false)
+
+                        if ripper and ripper.Enabled == true then
+                            PlayRipperJumpscare(entity)
+                        else
+                            DamagePlayer(entity)
+                        end
                     end
                 end
             end
@@ -1596,7 +1626,6 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
         if reboundType == "AMBUSH" then
             local pathfindNodes = GetPathfindNodesAmbush(config)
 
-            -- === LẮNG NGHE SỰ KIỆN TẠO PHÒNG MỚI ĐỂ CẬP NHẬT NODE NGAY LẬP TỨC ===
             local roomAddedConn
             roomAddedConn = CurrentRooms.ChildAdded:Connect(function(newRoom)
                 task.spawn(function()
@@ -1610,7 +1639,6 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
                 end)
             end)
 
-            -- Chạy theo số lượng Nodes (Tự cập nhật liên tục khi danh sách tăng thêm)
             local nodeIndex = 1
             while nodeIndex <= #pathfindNodes and entity:IsAlive() do
                 local v = pathfindNodes[nodeIndex]
@@ -1629,7 +1657,6 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
                     model:SetAttribute("Damage", true)
                     task.spawn(entity.RunCallback, entity, "OnRebounding", true)
 
-                    -- Quay về
                     for j = #pathfindNodes, 1, -1 do
                         local v = pathfindNodes[j]
                         if v and v.Parent then
@@ -1644,14 +1671,13 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
                     model:SetAttribute("Damage", true)
                     task.spawn(entity.RunCallback, entity, "OnRebounding", true)
                     
-                    -- Cập nhật danh sách Node mới nhất trước khi chạy tới tiếp
                     pathfindNodes = GetPathfindNodesAmbush(config)
 
                     local reIndex = 1
                     while reIndex <= #pathfindNodes and entity:IsAlive() do
                         local v = pathfindNodes[reIndex]
                         if v and v.Parent then
-                            local cframe = v.CFrame + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
+                            local cframe = v.Cframe + Vector3.new(0, 3 + config.Entity.HeightOffset, 0)
                             EntityMoveTo(model, cframe, config)
                             task.spawn(entity.RunCallback, entity, "OnReachNode", v)
                         end
