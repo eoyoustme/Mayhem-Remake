@@ -51,7 +51,10 @@ local entity = Spawner:Create({
 		ReboundMoveStyle = false,      
 		ReboundStyleTimes = 3,         
 		ReboundStyleSound = "rbxassetid://130994177179386", 
-		ReboundStyleVolume = 5        
+		ReboundStyleVolume = 5,
+
+		ChasePlayerWhenSee = false,
+		SpeedWhenChase = 7.5
 	},
 
 	Jumpscare = {
@@ -132,6 +135,10 @@ entity:SetCallback("OnLookAt", function(lineOfSight: boolean)
 end)
 
 entity:SetCallback("OnRebounding", function(startOfRebound: boolean)
+
+end)
+
+entity:SetCallback("PlayerGetSee", function()
 
 end)
 
