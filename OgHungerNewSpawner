@@ -92,7 +92,13 @@ local CONST = {
 				ReboundStyleVolume = 1,
 				ReboundStyleDelay = 2,
 				ChasePlayerWhenSee = false,
-				SpeedWhenChase = 7.5
+				SpeedWhenChase = 7.5,
+				Fakeout = {
+					Enabled = false,
+					RandomFakeout = false, -- Tỉ lệ 50-100, trúng 100 mới kích hoạt
+					EndSound = "rbxassetid://0",
+					SpeedMultiplier = 2
+				}
 			},
 			Damage = {
 				Enabled = true,
@@ -188,7 +194,10 @@ local CONST = {
 			OnDamagePlayer = function() end,
 			EndWhenGO = function() end,
 			PlayerGetSee = function() end,
-			CrucifixionOverwrite = nil
+			CrucifixionOverwrite = nil,
+			OnFakeoutStart = function() end,
+			OnFakeoutEnd = function() end,
+			OnReboundStyle = function() end
 		}
 	}
 }
@@ -1378,6 +1387,26 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 	local config = entity.Config
 	local debug = entity.Debug
 
+	-- Kiếm tra & Thiết lập Fakeout Logic
+	local isFakeout = false
+	local fakeoutConfig = config.Movement and config.Movement.Fakeout
+	if fakeoutConfig and fakeoutConfig.Enabled then
+		if fakeoutConfig.RandomFakeout then
+			local roll = math.random(50, 100)
+			if roll == 100 then
+				isFakeout = true
+			end
+		else
+			isFakeout = true
+		end
+	end
+
+	if isFakeout then
+		model:SetAttribute("IsFakeout", true)
+		model:SetAttribute("Damage", false)
+		task.spawn(entity.RunCallback, entity, "OnFakeoutStart")
+	end
+
 	model:SetAttribute("Running", true)
 	self.ActiveEntities[#self.ActiveEntities + 1] = entity
 
@@ -1412,6 +1441,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 					local newEntity = Module:Create(config)
 					if newEntity then
 						newEntity.Debug = CloneTable(entity.Debug)
+						task.spawn(entity.RunCallback, entity, "OnReboundStyle", newEntity)
 						Module:Run(newEntity, false, true)
 					end
 				end)
@@ -1648,6 +1678,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 			if
 				not model:GetAttribute("Paused")
 				and not usedCrucifix
+				and not isFakeout
 			then
 				local damage = config.Damage
 				local ripper = damage.JumpscareRipper
@@ -1859,6 +1890,36 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 		if model:GetAttribute("IsChasing") then
 			repeat task.wait(0.2) until not entity:IsAlive()
+		end
+
+		-- Xử lý điểm dừng của Fakeout
+		if isFakeout then
+			model:SetAttribute("Paused", true)
+
+			if fakeoutConfig.EndSound and fakeoutConfig.EndSound ~= "" and fakeoutConfig.EndSound ~= "rbxassetid://" and fakeoutConfig.EndSound ~= "rbxassetid://0" then
+				local sound = Instance.new("Sound")
+				sound.SoundId = fakeoutConfig.EndSound
+				sound.Volume = 1
+				sound.Parent = workspace
+				sound:Play()
+				Debris:AddItem(sound, 5)
+			end
+
+			task.spawn(entity.RunCallback, entity, "OnFakeoutEnd")
+
+			entity:Despawn()
+
+			-- Spawn Entity thật với Speed x2
+			local realConfig = CloneTable(config)
+			realConfig.Movement.Fakeout.Enabled = false
+			realConfig.Movement.Speed = (config.Movement.Speed / (CONST.BASE_ENTITY_SPEED / 100)) * (fakeoutConfig.SpeedMultiplier or 2)
+
+			local realEntity = Module:Create(realConfig)
+			if realEntity then
+				realEntity.Debug = CloneTable(entity.Debug)
+				Module:Run(realEntity, false, isReboundRespawn)
+			end
+			return
 		end
 
 		if entity:IsAlive() and not model:GetAttribute("Despawning") then
