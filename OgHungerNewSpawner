@@ -95,9 +95,9 @@ local CONST = {
 				SpeedWhenChase = 7.5,
 				Fakeout = {
 					Enabled = false,
-					RandomFakeout = false, -- true (50%) hoặc nhập số % (vd: 30 = 30%)
+					RandomFakeout = false,
 					EndSound = "rbxassetid://0",
-					EndDelay = 1, -- Thời gian chờ sau khi phát EndSound rồi mới gọi entity thật
+					EndDelay = 1,
 					SpeedMultiplier = 2
 				}
 			},
@@ -106,7 +106,7 @@ local CONST = {
 				KillOnMove = false,
 				Range = 40,
 				Amount = 125,
-				Cooldown = 1, -- Thời gian cooldown giữa mỗi lần mất máu
+				Cooldown = 1,
 				IgnoreHiding = false,
 				JumpscareRipper = {
 					Enabled = false,
@@ -145,7 +145,7 @@ local CONST = {
 			},
 			Rebounding = {
 				Enabled = true,
-				Type = "Ambush", -- "Blitz"
+				Type = "Ambush",
 				Min = 2,
 				Max = 4,
 				Delay = 2
@@ -958,7 +958,6 @@ local function IsPlayerProtected(): boolean
 	return (tick() - LastRespawn) <= LocalPlayer:GetAttribute("SpawnProtection")
 end
 
--- Hàm xử lý Mất Máu / Chết riêng biệt
 local function DamagePlayer(entity: any)
 	if Humanoid.Health <= 0 or IsPlayerProtected() then return end
 
@@ -974,10 +973,8 @@ local function DamagePlayer(entity: any)
 	Humanoid.Health = newHealth
 
 	if newHealth > 0 then
-		-- GỌI CALLBACK LÀM MẤT MÁU
 		task.spawn(entity.RunCallback, entity, "OnDamagePlayer", newHealth)
 	else
-		-- GỌI CALLBACK KILL PLAYER
 		task.spawn(entity.RunCallback, entity, "OnKillPlayer")
 
 		if #config.Death.Hints > 0 then
@@ -1229,8 +1226,10 @@ local function EntityMoveTo(model: Model, cframe: CFrame, config: any)
 end
 
 local function Earthquake()
-	Modules.Main_Game.camShaker:ShakeOnce(4, 12, 1, 5)
-	Modules.Main_Game.camShaker:ShakeOnce(10, 2, 3, 3)
+	pcall(function()
+		Modules.Main_Game.camShaker:ShakeOnce(4, 12, 1, 5)
+		Modules.Main_Game.camShaker:ShakeOnce(10, 2, 3, 3)
+	end)
 	Assets.Earthquake.SoundEarthquake:Play()
 	local v5 = CollectionService:GetTagged("PartCeiling")
 	local v6 = {}
@@ -1397,16 +1396,13 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 	local config = entity.Config
 	local debug = entity.Debug
 
-	-- Kiếm tra & Thiết lập Random Fakeout Logic
 	local isFakeout = false
 	local fakeoutConfig = config.Movement and config.Movement.Fakeout
 	if fakeoutConfig and fakeoutConfig.Enabled then
 		if fakeoutConfig.RandomFakeout then
 			if typeof(fakeoutConfig.RandomFakeout) == "number" then
-				-- Nếu nhập số % (ví dụ 30 => 30%)
 				isFakeout = (math.random(1, 100) <= fakeoutConfig.RandomFakeout)
 			else
-				-- Nếu đặt true => 50% tỉ lệ kích hoạt
 				isFakeout = (math.random(1, 2) == 1)
 			end
 		else
@@ -1723,7 +1719,6 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 						else
 							DamagePlayer(entity)
 
-							-- COOLDOWN SÁT THƯƠNG
 							local cd = damage.Cooldown or 1
 							task.delay(cd, function()
 								if model and model.Parent and not model:GetAttribute("IsFakeout") then
@@ -1735,9 +1730,10 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 				end
 			end
 
+			-- FIX: CameraShaker được làm mới an toàn cho cả Entity chính và Rebound Clone
 			do
 				local camShake = config.CameraShake
-				if camShake.Enabled then
+				if camShake and camShake.Enabled then
 					local mag = (charOrigin - origin).Magnitude
 					if mag <= camShake.Range then
 						local cloned = {}
@@ -1747,7 +1743,19 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 						cloned[1] = camShake.Values[1] / camShake.Range * (camShake.Range - mag)
 						cloned[2] = camShake.Values[2] / camShake.Range * (camShake.Range - mag)
-						Modules.Main_Game.camShaker:ShakeOnce(table.unpack(cloned))
+						
+						pcall(function()
+							local shaker = Modules.Main_Game.camShaker
+							if not shaker then
+								local CameraShaker = require(ReplicatedStorage:WaitForChild("CameraShaker"))
+								shaker = CameraShaker.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
+									Camera.CFrame = Camera.CFrame * shakeCf
+								end)
+								shaker:Start()
+								Modules.Main_Game.camShaker = shaker
+							end
+							shaker:ShakeOnce(table.unpack(cloned))
+						end)
 					end
 				end
 			end
@@ -1913,7 +1921,6 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 			repeat task.wait(0.2) until not entity:IsAlive()
 		end
 
-		-- Xử lý điểm dừng của Fakeout
 		if isFakeout then
 			model:SetAttribute("Paused", true)
 
@@ -1928,13 +1935,11 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 			task.spawn(entity.RunCallback, entity, "OnFakeoutEnd")
 
-			-- Chờ thời gian EndDelay trước khi biến mất và gọi Entity thật
 			local endDelay = fakeoutConfig.EndDelay or 1
 			task.wait(endDelay)
 
 			entity:Despawn()
 
-			-- Spawn Entity thật với Speed nhân hệ số SpeedMultiplier
 			local realConfig = CloneTable(config)
 			realConfig.Movement.Fakeout.Enabled = false
 			realConfig.Movement.Speed = (config.Movement.Speed / (CONST.BASE_ENTITY_SPEED / 100)) * (fakeoutConfig.SpeedMultiplier or 2)
