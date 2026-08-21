@@ -95,8 +95,9 @@ local CONST = {
 				SpeedWhenChase = 7.5,
 				Fakeout = {
 					Enabled = false,
-					RandomFakeout = false, -- Tỉ lệ 50-100, trúng 100 mới kích hoạt
+					RandomFakeout = false, -- true (50%) hoặc nhập số % (vd: 30 = 30%)
 					EndSound = "rbxassetid://0",
+					EndDelay = 1, -- Thời gian chờ sau khi phát EndSound rồi mới gọi entity thật
 					SpeedMultiplier = 2
 				}
 			},
@@ -105,6 +106,7 @@ local CONST = {
 				KillOnMove = false,
 				Range = 40,
 				Amount = 125,
+				Cooldown = 1, -- Thời gian cooldown giữa mỗi lần mất máu
 				IgnoreHiding = false,
 				JumpscareRipper = {
 					Enabled = false,
@@ -192,6 +194,7 @@ local CONST = {
 			OnDespawning = function() end,
 			OnDespawned = function() end,
 			OnDamagePlayer = function() end,
+			OnKillPlayer = function() end,
 			EndWhenGO = function() end,
 			PlayerGetSee = function() end,
 			CrucifixionOverwrite = nil,
@@ -530,6 +533,7 @@ local function PlayRipperJumpscare(entity: any)
 		to = false
 
 		if humanoid then humanoid.Health = 0 end
+		task.spawn(entity.RunCallback, entity, "OnKillPlayer")
 
 		local deathCause = config.Death.Cause ~= "" and config.Death.Cause or "Ripper"
 		pcall(function()
@@ -954,6 +958,7 @@ local function IsPlayerProtected(): boolean
 	return (tick() - LastRespawn) <= LocalPlayer:GetAttribute("SpawnProtection")
 end
 
+-- Hàm xử lý Mất Máu / Chết riêng biệt
 local function DamagePlayer(entity: any)
 	if Humanoid.Health <= 0 or IsPlayerProtected() then return end
 
@@ -967,9 +972,14 @@ local function DamagePlayer(entity: any)
 	end
 
 	Humanoid.Health = newHealth
-	task.spawn(entity.RunCallback, entity, "OnDamagePlayer", newHealth)
 
-	if newHealth == 0 then
+	if newHealth > 0 then
+		-- GỌI CALLBACK LÀM MẤT MÁU
+		task.spawn(entity.RunCallback, entity, "OnDamagePlayer", newHealth)
+	else
+		-- GỌI CALLBACK KILL PLAYER
+		task.spawn(entity.RunCallback, entity, "OnKillPlayer")
+
 		if #config.Death.Hints > 0 then
 			PlayerGui.MainUI.Death:GetPropertyChangedSignal("Visible"):Wait()
 
@@ -1387,14 +1397,17 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 	local config = entity.Config
 	local debug = entity.Debug
 
-	-- Kiếm tra & Thiết lập Fakeout Logic
+	-- Kiếm tra & Thiết lập Random Fakeout Logic
 	local isFakeout = false
 	local fakeoutConfig = config.Movement and config.Movement.Fakeout
 	if fakeoutConfig and fakeoutConfig.Enabled then
 		if fakeoutConfig.RandomFakeout then
-			local roll = math.random(50, 100)
-			if roll == 100 then
-				isFakeout = true
+			if typeof(fakeoutConfig.RandomFakeout) == "number" then
+				-- Nếu nhập số % (ví dụ 30 => 30%)
+				isFakeout = (math.random(1, 100) <= fakeoutConfig.RandomFakeout)
+			else
+				-- Nếu đặt true => 50% tỉ lệ kích hoạt
+				isFakeout = (math.random(1, 2) == 1)
 			end
 		else
 			isFakeout = true
@@ -1709,6 +1722,14 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 							PlayRipperJumpscare(entity)
 						else
 							DamagePlayer(entity)
+
+							-- COOLDOWN SÁT THƯƠNG
+							local cd = damage.Cooldown or 1
+							task.delay(cd, function()
+								if model and model.Parent and not model:GetAttribute("IsFakeout") then
+									model:SetAttribute("Damage", true)
+								end
+							end)
 						end
 					end
 				end
@@ -1907,9 +1928,13 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 			task.spawn(entity.RunCallback, entity, "OnFakeoutEnd")
 
+			-- Chờ thời gian EndDelay trước khi biến mất và gọi Entity thật
+			local endDelay = fakeoutConfig.EndDelay or 1
+			task.wait(endDelay)
+
 			entity:Despawn()
 
-			-- Spawn Entity thật với Speed x2
+			-- Spawn Entity thật với Speed nhân hệ số SpeedMultiplier
 			local realConfig = CloneTable(config)
 			realConfig.Movement.Fakeout.Enabled = false
 			realConfig.Movement.Speed = (config.Movement.Speed / (CONST.BASE_ENTITY_SPEED / 100)) * (fakeoutConfig.SpeedMultiplier or 2)
