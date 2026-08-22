@@ -1,0 +1,805 @@
+if not isfile then error("Executor của bạn không hỗ trợ file system (isfile/writefile)!") end
+
+local moduleCode = [[
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Debris = game:GetService("Debris")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local Module = {}
+Module.__index = Module
+
+--------------------------------------------------------------------------------
+-- HIDDEN INTERNAL FUNCTIONS (ẨN HOÀN TOÀN TRONG MODULE)
+--------------------------------------------------------------------------------
+local function caycaycay(TweenBig, ShowStrong, TweenShrinking, MaxStrength, MaxRoughness)
+	MaxStrength = MaxStrength or 7.5
+	MaxRoughness = MaxRoughness or 60
+
+	local TotalDuration = TweenBig + ShowStrong + TweenShrinking
+	local elapsedTime = 0
+	local tickCount = 0
+
+	local connection
+	connection = RunService.RenderStepped:Connect(function(deltaTime)
+		elapsedTime = elapsedTime + deltaTime
+
+		if elapsedTime >= TotalDuration then
+			connection:Disconnect()
+			return
+		end
+
+		local currentStrength = 0
+
+		if elapsedTime <= TweenBig then
+			local progress = elapsedTime / (TweenBig > 0 and TweenBig or 0.001)
+			local eased = TweenService:GetValue(progress, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			currentStrength = MaxStrength * eased
+		elseif elapsedTime <= (TweenBig + ShowStrong) then
+			currentStrength = MaxStrength
+		else
+			local progress = (elapsedTime - TweenBig - ShowStrong) / (TweenShrinking > 0 and TweenShrinking or 0.001)
+			local eased = TweenService:GetValue(progress, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			currentStrength = MaxStrength * (1 - eased)
+		end
+
+		tickCount = tickCount + deltaTime * MaxRoughness
+
+		local noiseVal = Vector3.new(
+			math.noise(tickCount, 0) * 0.5,
+			math.noise(0, tickCount) * 0.5,
+			math.noise(tickCount, tickCount) * 0.5
+		)
+
+		local shakeVector = noiseVal * currentStrength
+		local posAccumulator = shakeVector * Vector3.new(0.05, 0.05, 0.05)
+		local rotAccumulator = shakeVector * Vector3.new(1, 1, 1)
+
+		local shakeCFrame = CFrame.new(posAccumulator) * CFrame.Angles(
+			math.rad(rotAccumulator.X),
+			math.rad(rotAccumulator.Y),
+			math.rad(rotAccumulator.Z)
+		)
+
+		Camera.CFrame = Camera.CFrame * shakeCFrame
+	end)
+
+	return connection
+end
+
+local function getSortedRooms()
+	local GameplayFolder = workspace:WaitForChild("GameplayFolder")
+	local RoomsFolder = GameplayFolder:WaitForChild("Rooms")
+	local rooms = {}
+
+	for _, roomModel in ipairs(RoomsFolder:GetChildren()) do
+		if roomModel:IsA("Model") then
+			local lights = roomModel:FindFirstChild("Lights")
+			if lights then
+				local sign = lights:FindFirstChild("Sign", true)
+				if sign and sign:FindFirstChild("SurfaceGui") and sign.SurfaceGui:FindFirstChild("TextLabel") then
+					local roomNum = tonumber(sign.SurfaceGui.TextLabel.Text)
+					if roomNum then
+						table.insert(rooms, {Model = roomModel, Number = roomNum})
+					end
+				end
+			end
+		end
+	end
+
+	table.sort(rooms, function(a, b)
+		return a.Number > b.Number
+	end)
+
+	return rooms
+end
+
+local function isPlayerInLocker()
+	for _, descendant in ipairs(workspace:GetDescendants()) do
+		if descendant:IsA("Model") and descendant.Name == "Locker" then
+			local folder = descendant:FindFirstChild("Folder")
+			if folder then
+				local playerIn = folder:FindFirstChild("PlayerIn")
+				if playerIn and (playerIn.Value == true or playerIn.Value == LocalPlayer or playerIn.Value == LocalPlayer.Name) then
+					return true
+				end
+			end
+		end
+	end
+	return false
+end
+
+local function startCameraShake(mainPart, shakerConfig)
+	local HowFar = shakerConfig.HowFar
+	local MaxStrength = shakerConfig.Strength or shakerConfig.Strengh or 7.5
+	local MaxRoughness = shakerConfig.Roughness or 60
+
+	local minDist = HowFar / 10
+	local tick = 0
+
+	local connection
+	connection = RunService.RenderStepped:Connect(function(deltaTime)
+		if not mainPart or not mainPart.Parent then
+			connection:Disconnect()
+			return
+		end
+
+		local character = LocalPlayer.Character
+		local hrp = character and character:FindFirstChild("HumanoidRootPart")
+		if not hrp then return end
+
+		local dist = (hrp.Position - mainPart.Position).Magnitude
+
+		if dist <= HowFar then
+			local rawProgress = math.clamp(1 - ((dist - minDist) / (HowFar - minDist)), 0, 1)
+			local easedProgress = TweenService:GetValue(rawProgress, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+			local currentStrength = MaxStrength * easedProgress
+			local currentRoughness = MaxRoughness * easedProgress
+
+			tick = tick + deltaTime * currentRoughness
+
+			local noiseVal = Vector3.new(
+				math.noise(tick, 0) * 0.5,
+				math.noise(0, tick) * 0.5,
+				math.noise(tick, tick) * 0.5
+			)
+
+			local shakeVector = noiseVal * currentStrength
+			local posAccumulator = shakeVector * Vector3.new(0.05, 0.05, 0.05)
+			local rotAccumulator = shakeVector * Vector3.new(1, 1, 1)
+
+			local shakeCFrame = CFrame.new(posAccumulator) * CFrame.Angles(
+				math.rad(rotAccumulator.X),
+				math.rad(rotAccumulator.Y),
+				math.rad(rotAccumulator.Z)
+			)
+
+			Camera.CFrame = Camera.CFrame * shakeCFrame
+		end
+	end)
+
+	return connection
+end
+
+local function triggerLightFlicker(config, duration)
+	if not config.Flicker then return end
+
+	local lightsList = {}
+	local createdSounds = {}
+
+	for _, desc in ipairs(workspace:GetDescendants()) do
+		if desc:IsA("Light") then
+			table.insert(lightsList, {
+				Instance = desc,
+				OriginalColor = desc.Color
+			})
+
+			local parentPart = desc.Parent
+			if parentPart and parentPart:IsA("BasePart") then
+				local sound = Instance.new("Sound")
+				sound.Name = "FlickerSound"
+				sound.SoundId = "rbxassetid://119568146226810"
+				sound.Volume = 0.4
+				sound.RollOffMinDistance = 30
+				sound.RollOffMaxDistance = 60
+				sound.Looped = true
+				sound.LoopRegion = NumberRange.new(0, 1.2)
+				sound.PlaybackRegionsEnabled = true
+
+				local reverb = Instance.new("ReverbSoundEffect")
+				reverb.Parent = sound
+
+				sound.Parent = parentPart
+				sound:Play()
+				table.insert(createdSounds, sound)
+			end
+		end
+	end
+
+	local startTime = os.clock()
+	local blackColor = Color3.fromRGB(0, 0, 0)
+
+	while os.clock() - startTime < duration do
+		for _, lightData in ipairs(lightsList) do
+			if lightData.Instance and lightData.Instance.Parent then
+				lightData.Instance.Color = blackColor
+			end
+		end
+		task.wait(0.05)
+
+		for _, lightData in ipairs(lightsList) do
+			if lightData.Instance and lightData.Instance.Parent then
+				lightData.Instance.Color = lightData.OriginalColor
+			end
+		end
+		task.wait(0.05)
+	end
+
+	for _, lightData in ipairs(lightsList) do
+		if lightData.Instance and lightData.Instance.Parent then
+			lightData.Instance.Color = lightData.OriginalColor
+		end
+	end
+
+	for _, sound in ipairs(createdSounds) do
+		if sound then
+			sound:Stop()
+			sound:Destroy()
+		end
+	end
+end
+
+local function breakRoomLights(config, roomModel)
+	if not config.BreakLight or not roomModel then return end
+
+	local roomLights = {}
+	for _, desc in ipairs(roomModel:GetDescendants()) do
+		if desc:IsA("Light") then
+			table.insert(roomLights, desc)
+		end
+	end
+
+	for _, lightObj in ipairs(roomLights) do
+		if lightObj and lightObj.Parent then
+			lightObj.Color = Color3.fromRGB(0, 0, 0)
+			task.wait(0.1)
+		end
+	end
+end
+
+--------------------------------------------------------------------------------
+-- CONSTRUCTOR & PUBLIC API
+--------------------------------------------------------------------------------
+function Module.new(config)
+	local self = setmetatable({}, Module)
+	self.Config = config
+	self.Callbacks = {}
+	self.CanDamage = true
+	self.IsJumpscaring = false
+	return self
+end
+
+function Module:Debug(eventName)
+	return function(callback)
+		self.Callbacks[eventName] = callback
+		return callback
+	end
+end
+
+function Module:KillPlayer()
+	if self.Callbacks["OnKillPlayer"] then
+		self.Callbacks["OnKillPlayer"]()
+		return
+	end
+
+	local character = LocalPlayer.Character
+	if not character then return end
+
+	local currentHealth = 100
+	local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+	if playerGui then
+		local mainGui = playerGui:FindFirstChild("Main")
+		local healthLabel = mainGui and mainGui:FindFirstChild("Health") and mainGui.Health:FindFirstChild("TextLabel")
+		if healthLabel and healthLabel:IsA("TextLabel") then
+			local cleanText = string.gsub(healthLabel.Text, "[^%d]", "")
+			currentHealth = tonumber(cleanText) or 100
+		end
+	end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.Health > 0 then
+		currentHealth = math.max(currentHealth, humanoid.Health)
+	end
+
+	local damageRemote = ReplicatedStorage:FindFirstChild("LocalDamage", true) or ReplicatedStorage:FindFirstChild("ChangeHealth", true)
+
+	if damageRemote then
+		if damageRemote.Name == "LocalDamage" then
+			damageRemote:FireServer(currentHealth, "SittingItOut", 1, nil)
+		else
+			damageRemote:FireServer("Damage", currentHealth)
+		end
+	end
+
+	pcall(function()
+		task.spawn(function()
+			local pGui = LocalPlayer.PlayerGui
+			local entityPage = pGui.Main.AfterDeath.Document.EntityPage
+
+			local imgLabel = entityPage.DeathFrame.Entities.Button.ImageLabel
+			if self.Config.DeathImage == "" or self.Config.DeathImage == "rbxassetid://0" then
+				imgLabel.BackgroundTransparency = 1
+			end
+			imgLabel.Image = self.Config.DeathImage
+			entityPage.DeathFrame.EntityName.Text = self.Config.DeathName
+			pGui.Main.AfterDeath.Document.ScorePage.OverseerNotes.Text = self.Config.DeathNotes
+		end)
+	end)
+end
+
+function Module:ProcessDamage(damageAmount)
+	damageAmount = damageAmount or 20
+	if self.CanDamage then
+		self.CanDamage = false
+
+		if self.Callbacks["OnDamage"] then
+			self.Callbacks["OnDamage"](damageAmount)
+		else
+			local character = LocalPlayer.Character
+			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+			if humanoid then
+				humanoid:TakeDamage(damageAmount)
+			end
+		end
+
+		-- Mất máu lần đầu ngay lập tức, cooldown lần sau là 2 giây
+		task.delay(2, function()
+			self.CanDamage = true
+		end)
+	end
+end
+
+function Module:JumpscareRipper(entityModel)
+	local cfg = self.Config.JumpscareRipper
+	if not cfg or not cfg.Enabled then
+		self:KillPlayer()
+		return
+	end
+
+	if self.IsJumpscaring then return end
+	self.IsJumpscaring = true
+
+	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local humanoid = character:WaitForChild("Humanoid", 5)
+	local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+	local primaryPart = (cfg.TargetPartName and entityModel:FindFirstChild(cfg.TargetPartName)) 
+		or entityModel:FindFirstChildWhichIsA("BasePart")
+
+	if not (entityModel and humanoid and humanoidRootPart and primaryPart) then 
+		self:KillPlayer()
+		self.IsJumpscaring = false
+		return 
+	end
+
+	local originalWalkSpeed = humanoid.WalkSpeed
+	local originalJumpPower = humanoid.JumpPower
+	humanoid.WalkSpeed = 0
+	humanoid.JumpPower = 0
+
+	pcall(function()
+		local controlsModule = require(LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule")):GetControls()
+		controlsModule:Disable()
+	end)
+
+	local function SetAllParticlesTimeScale(model, timescale)
+		for _, descendant in ipairs(model:GetDescendants()) do
+			if descendant:IsA("ParticleEmitter") then
+				descendant.TimeScale = timescale
+			end
+		end
+	end
+
+	SetAllParticlesTimeScale(entityModel, 1)
+
+	local to = true
+	task.spawn(function()
+		while to and primaryPart.Parent and humanoidRootPart.Parent do
+			local targetCFrame = humanoidRootPart.CFrame
+			local tween = TweenService:Create(primaryPart, TweenInfo.new(2000000000000, Enum.EasingStyle.Quad), {CFrame = targetCFrame})
+			tween:Play()
+			tween.Completed:Wait()
+		end
+	end)
+
+	local ripeAttachment = primaryPart:FindFirstChild(cfg.AttachmentName or "Attachment", true)
+	if ripeAttachment then
+		local emitter = ripeAttachment:FindFirstChild(cfg.ParticleName or "ParticleEmitter") or ripeAttachment:FindFirstChildWhichIsA("ParticleEmitter")
+		if emitter then
+			if cfg.ParticleTexture and cfg.ParticleTexture ~= "" then
+				emitter.Texture = cfg.ParticleTexture
+			end
+			emitter.Size = NumberSequence.new(10)
+			emitter.Squash = NumberSequence.new(0)
+			emitter.Enabled = true
+			emitter:Emit(20)
+			task.wait(0.1)
+			emitter.TimeScale = 0
+		end
+	end
+
+	Camera.CameraType = Enum.CameraType.Scriptable
+
+	local lockConnection
+	lockConnection = RunService.RenderStepped:Connect(function()
+		if not primaryPart or not primaryPart.Parent then
+			if lockConnection then lockConnection:Disconnect() end
+			return
+		end
+		Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, primaryPart.Position)
+	end)
+
+	task.wait(0.35)
+	Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, primaryPart.Position)
+
+	SetAllParticlesTimeScale(entityModel, 0)
+
+	for _, descendant in ipairs(entityModel:GetDescendants()) do
+		if descendant:IsA("Sound") then
+			descendant.Playing = false
+			descendant.Volume = 0
+		end
+	end
+
+	if cfg.SlamSoundId and cfg.SlamSoundId ~= "rbxassetid://0" and cfg.SlamSoundId ~= "" then
+		local slamSnd = Instance.new("Sound")
+		slamSnd.SoundId = cfg.SlamSoundId
+		slamSnd.Volume = 1
+		slamSnd.Parent = workspace
+		slamSnd:Play()
+		Debris:AddItem(slamSnd, 5)
+	end
+
+	if cfg.SoundUrl and cfg.SoundUrl ~= "" then
+		pcall(function()
+			local soundName = "Kill_Ripper"
+			if isfile and writefile and (getcustomasset or getsynasset) then
+				if not isfile(soundName .. ".mp3") then
+					writefile(soundName .. ".mp3", game:HttpGet(cfg.SoundUrl))
+				end
+				local sound = Instance.new("Sound")
+				sound.SoundId = (getcustomasset or getsynasset)(soundName .. ".mp3")
+				sound.Parent = workspace
+				sound.Volume = 1
+				sound.PlaybackSpeed = 1
+				sound:Play()
+				Debris:AddItem(sound, 10)
+			end
+		end)
+	end
+
+	task.wait(1)
+
+	local jumpscareImages = cfg.Images or {}
+	local screenGui, imageLabel
+
+	if #jumpscareImages > 0 then
+		screenGui = Instance.new("ScreenGui")
+		screenGui.Name = "JumpscareOverlay"
+		screenGui.IgnoreGuiInset = true
+		screenGui.DisplayOrder = 999999
+		screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+		imageLabel = Instance.new("ImageLabel")
+		imageLabel.BackgroundTransparency = 1
+		imageLabel.BorderSizePixel = 0
+		imageLabel.Size = UDim2.new(1, 0, 1, 0)
+		imageLabel.ScaleType = Enum.ScaleType.Stretch
+		imageLabel.ImageTransparency = 1
+		imageLabel.Parent = screenGui
+
+		imageLabel.Image = jumpscareImages[1]
+		TweenService:Create(imageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Linear), {ImageTransparency = 0}):Play()
+
+		local start = tick()
+		local flashDuration = cfg.FlashDuration or 1.6
+
+		while tick() - start < flashDuration do
+			for _, imgId in ipairs(jumpscareImages) do
+				imageLabel.Image = imgId
+				task.wait()
+			end
+		end
+
+		imageLabel.ImageTransparency = 1
+	end
+
+	to = false
+	self:KillPlayer()
+
+	if cfg.EndSoundId and cfg.EndSoundId ~= "" and cfg.EndSoundId ~= "rbxassetid://0" then
+		local endSound = Instance.new("Sound")
+		endSound.SoundId = cfg.EndSoundId
+		endSound.Volume = 10
+		endSound.PlaybackSpeed = 0.7
+		endSound.Parent = workspace
+		endSound:Play()
+		Debris:AddItem(endSound, 5)
+	end
+
+	if lockConnection then lockConnection:Disconnect() end
+	Camera.CameraType = Enum.CameraType.Custom
+
+	if screenGui and screenGui.Parent then
+		screenGui:Destroy()
+	end
+
+	if humanoid and humanoid.Health > 0 then
+		humanoid.WalkSpeed = originalWalkSpeed
+		humanoid.JumpPower = originalJumpPower
+		pcall(function()
+			local controlsModule = require(LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule")):GetControls()
+			controlsModule:Enable()
+		end)
+	end
+
+	if entityModel and entityModel.Parent then
+		entityModel:Destroy()
+	end
+
+	self.IsJumpscaring = false
+end
+
+function Module:HandlePlayerDeath(entityModel)
+	if self.Config.JumpscareRipper and self.Config.JumpscareRipper.Enabled then
+		self:JumpscareRipper(entityModel)
+	else
+		self:KillPlayer()
+	end
+end
+
+function Module:StartSpawn()
+	local sortedRooms = getSortedRooms()
+	if #sortedRooms == 0 then return end
+
+	if self.Config.Flicker then
+		task.spawn(function()
+			triggerLightFlicker(self.Config, self.Config.FlickerDur or 2)
+		end)
+	end
+
+	task.wait(self.Config.Delay)
+
+	local success, objects = pcall(function()
+		return game:GetObjects(self.Config.EntityModel)
+	end)
+
+	if not success or not objects or not objects[1] then return end
+
+	local entityModel = objects[1]
+	local mainPart = entityModel:IsA("BasePart") and entityModel or entityModel:FindFirstChildWhichIsA("BasePart")
+	if mainPart:FindFirstChild("Attack") then
+		mainPart.Attack:Stop()
+	end
+
+	if not mainPart then
+		entityModel:Destroy()
+		return
+	end
+
+	local firstRoom = sortedRooms[1]
+	if firstRoom and firstRoom.Model then
+		local entityNodes = firstRoom.Model:FindFirstChild("EntityNodes")
+		local entranceNode = entityNodes and entityNodes:FindFirstChild("Entrance")
+
+		if entranceNode then
+			mainPart.CFrame = entranceNode.CFrame + Vector3.new(0, self.Config.HeightOfOffset, 0)
+		end
+	end
+
+	entityModel.Parent = workspace
+	startCameraShake(mainPart, self.Config.CameraShaker)
+
+	local effectiveHitbox = (self.Config.PandemoniumMove or self.Config.PipSqueakMove) and (self.Config.Hitbox / 10) or self.Config.Hitbox
+	local hasSlammedLocker = false
+
+	for reboundCount = 0, self.Config.Rebounding do
+		local isRebounding = (reboundCount % 2 == 1)
+
+		local startRoomIdx = isRebounding and #sortedRooms or 1
+		local endRoomIdx = isRebounding and 1 or #sortedRooms
+		local step = isRebounding and -1 or 1
+
+		for roomIdx = startRoomIdx, endRoomIdx, step do
+			local roomData = sortedRooms[roomIdx]
+			local roomModel = roomData.Model
+
+			if self.Config.BreakLight then
+				task.spawn(function()
+					breakRoomLights(self.Config, roomModel)
+				end)
+			end
+
+			local entityNodes = roomModel:FindFirstChild("EntityNodes")
+			if not entityNodes then continue end
+
+			local startNodeName = isRebounding and "Exit" or "Entrance"
+			local endNodeName = isRebounding and "Entrance" or "Exit"
+			local connectionKey = isRebounding and "Previous" or "Next"
+
+			local currentNode = entityNodes:FindFirstChild(startNodeName)
+			if not currentNode then continue end
+
+			while currentNode do
+				local targetPos = currentNode.Position + Vector3.new(0, self.Config.HeightOfOffset, 0)
+
+				while (mainPart.Position - targetPos).Magnitude > 1 do
+					local dt = RunService.RenderStepped:Wait()
+					local direction = (targetPos - mainPart.Position).Unit
+					local moveStep = direction * self.Config.Speed * dt
+
+					if (targetPos - mainPart.Position).Magnitude < moveStep.Magnitude then
+						mainPart.CFrame = CFrame.new(targetPos)
+					else
+						mainPart.CFrame = CFrame.new(mainPart.Position + moveStep)
+					end
+
+					local character = LocalPlayer.Character
+					local hrp = character and character:FindFirstChild("HumanoidRootPart")
+
+					if hrp then
+						if self.Config.PipSqueakMove then
+							if isPlayerInLocker() then
+								if not hasSlammedLocker then
+									local rayOrigin = mainPart.Position
+									local rayDirection = (hrp.Position - rayOrigin)
+
+									local raycastParams = RaycastParams.new()
+									raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+									raycastParams.FilterDescendantsInstances = {entityModel}
+
+									local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+
+									if rayResult and rayResult.Instance then
+										hasSlammedLocker = true 
+										local base = mainPart:FindFirstChildWhichIsA("BasePart") or mainPart
+										if base:FindFirstChild("Attack") then base.Attack:Play() end
+										if base:FindFirstChild("Idle") then base.Idle:Stop() end
+										if base:FindFirstChild("PandemoniumEyes") then base.PandemoniumEyes.Enabled = true end
+
+										local targetCFrame = hrp.CFrame * CFrame.new(0, 0, 4)
+										local chaseDistance = (targetCFrame.Position - mainPart.Position).Magnitude
+										local duration = chaseDistance / (self.Config.Speed * 1.2)
+										if duration <= 0 then duration = 0.05 end
+
+										local chaseTween = TweenService:Create(
+											mainPart,
+											TweenInfo.new(duration, Enum.EasingStyle.Linear),
+											{CFrame = targetCFrame}
+										)
+										chaseTween:Play()
+										chaseTween.Completed:Wait()
+
+										caycaycay(0.577, 5.771, 1, 5, 5)
+
+										local waitTime = self.Config.PipSqueakDelay or 2
+										if self.Config.SoundSlamPipSqueak and self.Config.SoundSlamPipSqueak ~= "rbxassetid://0" and self.Config.SoundSlamPipSqueak ~= "" then
+											local slamSnd = Instance.new("Sound")
+											slamSnd.SoundId = self.Config.SoundSlamPipSqueak
+											slamSnd.Volume = 5
+											slamSnd.Parent = workspace
+											slamSnd:Play()
+
+											if not slamSnd.IsLoaded then slamSnd.Loaded:Wait() end
+											if slamSnd.TimeLength and slamSnd.TimeLength > 0 then waitTime = slamSnd.TimeLength end
+											Debris:AddItem(slamSnd, waitTime + 1)
+										end
+
+										task.wait(waitTime)
+										if base:FindFirstChild("Attack") then base.Attack:Stop() end
+										if base:FindFirstChild("Idle") then base.Idle:Play() end
+										if base:FindFirstChild("PandemoniumEyes") then base.PandemoniumEyes.Enabled = false end
+									end
+								else
+									hasSlammedLocker = false
+
+									local rayOrigin = mainPart.Position
+									local rayDirection = (hrp.Position - rayOrigin)
+
+									local raycastParams = RaycastParams.new()
+									raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+									raycastParams.FilterDescendantsInstances = {entityModel}
+
+									local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+
+									if rayResult and rayResult.Instance and rayResult.Instance:IsDescendantOf(character) then
+										self:ProcessDamage(20)
+										self:HandlePlayerDeath(entityModel)
+										break
+									end
+								end
+							end
+
+							if self.Config.PandemoniumMove and not isPlayerInLocker() then
+								local rayOrigin = mainPart.Position
+								local rayDirection = (hrp.Position - rayOrigin)
+
+								local raycastParams = RaycastParams.new()
+								raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+								raycastParams.FilterDescendantsInstances = {entityModel}
+
+								local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+
+								if rayResult and rayResult.Instance and rayResult.Instance:IsDescendantOf(character) then
+									local silenceModel = workspace:FindFirstChild("Model")
+									local movePart = (silenceModel and (silenceModel:FindFirstChild("Pandemonium") or silenceModel:FindFirstChildWhichIsA("BasePart"))) or mainPart
+									movePart.Anchored = true
+
+									while character and character:FindFirstChild("HumanoidRootPart") and not isPlayerInLocker() do
+										local currentHrp = character.HumanoidRootPart
+										local distToPlayer = (currentHrp.Position - movePart.Position).Magnitude
+
+										if distToPlayer <= (effectiveHitbox / 2) then
+											self:ProcessDamage(20)
+											self:HandlePlayerDeath(entityModel)
+											break
+										end
+
+										local targetCFrame = currentHrp.CFrame * CFrame.new(0, 2, 0)
+										local distance = (targetCFrame.Position - movePart.Position).Magnitude
+										local SPEED_STUDS_PER_SECOND = 15
+										local duration = distance / SPEED_STUDS_PER_SECOND
+
+										if duration <= 0 then duration = 0.05 end
+
+										local tween = TweenService:Create(
+											movePart,
+											TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut),
+											{CFrame = targetCFrame}
+										)
+
+										tween:Play()
+										tween.Completed:Wait()
+
+										if (currentHrp.Position - movePart.Position).Magnitude <= (effectiveHitbox / 2) then
+											self:ProcessDamage(20)
+											self:HandlePlayerDeath(entityModel)
+											break
+										end
+									end
+								end
+							end
+
+							local distance = (hrp.Position - mainPart.Position).Magnitude
+							if distance <= (effectiveHitbox / 2) then
+								if not isPlayerInLocker() then
+									self:ProcessDamage(20)
+									task.wait(0.1)
+									self:HandlePlayerDeath(entityModel)
+								end
+							end
+						end
+					end
+
+					local connections = currentNode:FindFirstChild("Connections")
+					local nextVal = connections and connections:FindFirstChild(connectionKey)
+
+					if nextVal and nextVal.Value then
+						if typeof(nextVal.Value) == "Instance" and nextVal.Value:IsA("BasePart") then
+							currentNode = nextVal.Value
+						elseif typeof(nextVal.Value) == "string" then
+							if nextVal.Value == endNodeName then
+								local targetEndNode = entityNodes:FindFirstChild(endNodeName)
+								if targetEndNode and currentNode ~= targetEndNode then
+									currentNode = targetEndNode
+								else
+									currentNode = nil
+								end
+							else
+								currentNode = entityNodes:FindFirstChild(nextVal.Value)
+							end
+						else
+							currentNode = nil
+						end
+					else
+						currentNode = nil
+					end
+				end
+			end
+		end
+
+		if entityModel and entityModel.Parent then
+			entityModel:Destroy()
+		end
+	end
+
+	return Module
+]]
+
+writefile("EntityModule.lua", moduleCode)
+print("Da save EntityModule.lua thanh cong vao workspace cua Executor!")
