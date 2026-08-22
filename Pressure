@@ -1,6 +1,3 @@
-if not isfile then error("Executor của bạn không hỗ trợ file system (isfile/writefile)!") end
-
-local moduleCode = [[
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -13,9 +10,6 @@ local Camera = workspace.CurrentCamera
 local Module = {}
 Module.__index = Module
 
---------------------------------------------------------------------------------
--- HIDDEN INTERNAL FUNCTIONS (ẨN HOÀN TOÀN TRONG MODULE)
---------------------------------------------------------------------------------
 local function caycaycay(TweenBig, ShowStrong, TweenShrinking, MaxStrength, MaxRoughness)
 	MaxStrength = MaxStrength or 7.5
 	MaxRoughness = MaxRoughness or 60
@@ -252,9 +246,7 @@ local function breakRoomLights(config, roomModel)
 	end
 end
 
---------------------------------------------------------------------------------
--- CONSTRUCTOR & PUBLIC API
---------------------------------------------------------------------------------
+
 function Module.new(config)
 	local self = setmetatable({}, Module)
 	self.Config = config
@@ -337,7 +329,6 @@ function Module:ProcessDamage(damageAmount)
 			end
 		end
 
-		-- Mất máu lần đầu ngay lập tức, cooldown lần sau là 2 giây
 		task.delay(2, function()
 			self.CanDamage = true
 		end)
@@ -797,9 +788,6 @@ function Module:StartSpawn()
 			entityModel:Destroy()
 		end
 	end
+end
 
-	return Module
-]]
-
-writefile("EntityModule.lua", moduleCode)
-print("Da save EntityModule.lua thanh cong vao workspace cua Executor!")
+return Module
