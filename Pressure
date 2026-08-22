@@ -66,8 +66,12 @@ local function caycaycay(TweenBig, ShowStrong, TweenShrinking, MaxStrength, MaxR
 end
 
 local function getSortedRooms()
-	local GameplayFolder = workspace:WaitForChild("GameplayFolder")
-	local RoomsFolder = GameplayFolder:WaitForChild("Rooms")
+	local GameplayFolder = workspace:FindFirstChild("GameplayFolder") or workspace:WaitForChild("GameplayFolder", 5)
+	if not GameplayFolder then return {} end
+
+	local RoomsFolder = GameplayFolder:FindFirstChild("Rooms") or GameplayFolder:WaitForChild("Rooms", 5)
+	if not RoomsFolder then return {} end
+
 	local rooms = {}
 
 	for _, roomModel in ipairs(RoomsFolder:GetChildren()) do
@@ -254,6 +258,7 @@ function Module.new(config)
 	self.Callbacks = {}
 	self.CanDamage = true
 	self.IsJumpscaring = false
+	self.IsDead = false
 	return self
 end
 
@@ -265,8 +270,13 @@ function Module:Debug(eventName)
 end
 
 function Module:KillPlayer()
+	if self.IsDead then return end
+	self.IsDead = true
+
 	if self.Callbacks and self.Callbacks["OnKillPlayer"] then
-		self.Callbacks["OnKillPlayer"]()
+		local cb = self.Callbacks["OnKillPlayer"]
+		self.Callbacks["OnKillPlayer"] = nil
+		cb()
 		return
 	end
 
@@ -276,7 +286,6 @@ function Module:KillPlayer()
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	local currentHealth = 100
 
-	-- Lấy máu hiện tại từ UI
 	local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
 	if playerGui then
 		local mainGui = playerGui:FindFirstChild("Main")
@@ -291,7 +300,6 @@ function Module:KillPlayer()
 		currentHealth = math.max(currentHealth, humanoid.Health)
 	end
 
-	-- Tìm và gửi RemoteEvent tiêu diệt player
 	local damageRemote = ReplicatedStorage:FindFirstChild("LocalDamage", true) or ReplicatedStorage:FindFirstChild("ChangeHealth", true)
 
 	if damageRemote then
@@ -301,28 +309,26 @@ function Module:KillPlayer()
 			damageRemote:FireServer("Damage", currentHealth)
 		end
 	elseif humanoid then
-		-- Dự phòng nếu không tìm thấy RemoteEvent
 		humanoid.Health = 0
 	end
 
-	-- Cập nhật thông tin UI Sau Khi Chết (Đã sửa pcall & nil check)
 	task.spawn(function()
 		pcall(function()
 			local cfg = self.Config or {}
 			local pGui = LocalPlayer:FindFirstChild("PlayerGui")
 			if not pGui then return end
 
-			local mainGui = pGui:FindFirstChild("Main")
-			local afterDeath = mainGui and mainGui:FindFirstChild("AfterDeath")
-			local document = afterDeath and afterDeath:FindFirstChild("Document")
-			local entityPage = document and document:FindFirstChild("EntityPage")
+			local entityPage = pGui:FindFirstChild("Main")
+				and pGui.Main:FindFirstChild("AfterDeath")
+				and pGui.Main.AfterDeath:FindFirstChild("Document")
+				and pGui.Main.AfterDeath.Document:FindFirstChild("EntityPage")
 
 			if entityPage then
 				local deathFrame = entityPage:FindFirstChild("DeathFrame")
 				if deathFrame then
-					local entities = deathFrame:FindFirstChild("Entities")
-					local button = entities and entities:FindFirstChild("Button")
-					local imgLabel = button and button:FindFirstChild("ImageLabel")
+					local imgLabel = deathFrame:FindFirstChild("Entities")
+						and deathFrame.Entities:FindFirstChild("Button")
+						and deathFrame.Entities.Button:FindFirstChild("ImageLabel")
 
 					if imgLabel then
 						if not cfg.DeathImage or cfg.DeathImage == "" or cfg.DeathImage == "rbxassetid://0" then
@@ -339,11 +345,13 @@ function Module:KillPlayer()
 				end
 			end
 
-			if document then
-				local scorePage = document:FindFirstChild("ScorePage")
-				if scorePage and scorePage:FindFirstChild("OverseerNotes") then
-					scorePage.OverseerNotes.Text = cfg.DeathNotes or ""
-				end
+			local scorePage = pGui:FindFirstChild("Main")
+				and pGui.Main:FindFirstChild("AfterDeath")
+				and pGui.Main.AfterDeath:FindFirstChild("Document")
+				and pGui.Main.AfterDeath.Document:FindFirstChild("ScorePage")
+
+			if scorePage and scorePage:FindFirstChild("OverseerNotes") then
+				scorePage.OverseerNotes.Text = cfg.DeathNotes or ""
 			end
 		end)
 	end)
@@ -354,7 +362,7 @@ function Module:ProcessDamage(damageAmount)
 	if self.CanDamage then
 		self.CanDamage = false
 
-		if self.Callbacks["OnDamage"] then
+		if self.Callbacks and self.Callbacks["OnDamage"] then
 			self.Callbacks["OnDamage"](damageAmount)
 		else
 			local character = LocalPlayer.Character
@@ -371,7 +379,7 @@ function Module:ProcessDamage(damageAmount)
 end
 
 function Module:JumpscareRipper(entityModel)
-	local cfg = self.Config.JumpscareRipper
+	local cfg = self.Config and self.Config.JumpscareRipper
 	if not cfg or not cfg.Enabled then
 		self:KillPlayer()
 		return
@@ -382,7 +390,7 @@ function Module:JumpscareRipper(entityModel)
 
 	local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 	local humanoid = character:WaitForChild("Humanoid", 5)
-	local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+	local humanoidRootPart = character:WaitForChild("HumanoidRootPart", 5)
 
 	local primaryPart = (cfg.TargetPartName and entityModel:FindFirstChild(cfg.TargetPartName)) 
 		or entityModel:FindFirstChildWhichIsA("BasePart")
@@ -415,7 +423,7 @@ function Module:JumpscareRipper(entityModel)
 
 	local to = true
 	task.spawn(function()
-		while to and primaryPart.Parent and humanoidRootPart.Parent do
+		while to and primaryPart and primaryPart.Parent and humanoidRootPart and humanoidRootPart.Parent do
 			local targetCFrame = humanoidRootPart.CFrame
 			local tween = TweenService:Create(primaryPart, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {CFrame = targetCFrame})
 			tween:Play()
@@ -451,7 +459,9 @@ function Module:JumpscareRipper(entityModel)
 	end)
 
 	task.wait(0.35)
-	Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, primaryPart.Position)
+	if primaryPart and primaryPart.Parent then
+		Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, primaryPart.Position)
+	end
 
 	SetAllParticlesTimeScale(entityModel, 0)
 
@@ -562,7 +572,7 @@ function Module:JumpscareRipper(entityModel)
 end
 
 function Module:HandlePlayerDeath(entityModel)
-	if self.Config.JumpscareRipper and self.Config.JumpscareRipper.Enabled then
+	if self.Config and self.Config.JumpscareRipper and self.Config.JumpscareRipper.Enabled then
 		self:JumpscareRipper(entityModel)
 	else
 		self:KillPlayer()
@@ -573,16 +583,20 @@ function Module:StartSpawn()
 	local sortedRooms = getSortedRooms()
 	if #sortedRooms == 0 then return end
 
-	if self.Config.Flicker then
+	local cfg = self.Config or {}
+
+	if cfg.Flicker then
 		task.spawn(function()
-			triggerLightFlicker(self.Config, self.Config.FlickerDur or 2)
+			triggerLightFlicker(cfg, cfg.FlickerDur or 2)
 		end)
 	end
 
-	task.wait(self.Config.Delay or 0)
+	task.wait(cfg.Delay or 0)
+
+	if not cfg.EntityModel then return end
 
 	local success, objects = pcall(function()
-		return game:GetObjects(self.Config.EntityModel)
+		return game:GetObjects(cfg.EntityModel)
 	end)
 
 	if not success or not objects or not objects[1] then return end
@@ -598,26 +612,30 @@ function Module:StartSpawn()
 		mainPart.Attack:Stop()
 	end
 
+	local heightOffset = cfg.HeightOfOffset or 0
 	local firstRoom = sortedRooms[1]
+
 	if firstRoom and firstRoom.Model then
 		local entityNodes = firstRoom.Model:FindFirstChild("EntityNodes")
 		local entranceNode = entityNodes and entityNodes:FindFirstChild("Entrance")
 
 		if entranceNode then
-			mainPart.CFrame = entranceNode.CFrame + Vector3.new(0, self.Config.HeightOfOffset or 0, 0)
+			mainPart.CFrame = entranceNode.CFrame + Vector3.new(0, heightOffset, 0)
 		end
 	end
 
 	entityModel.Parent = workspace
-	startCameraShake(mainPart, self.Config.CameraShaker)
+	startCameraShake(mainPart, cfg.CameraShaker)
 
-	local effectiveHitbox = (self.Config.PandemoniumMove or self.Config.PipSqueakMove) and (self.Config.Hitbox / 10) or (self.Config.Hitbox or 10)
+	local rawHitbox = cfg.Hitbox or 10
+	local effectiveHitbox = (cfg.PandemoniumMove or cfg.PipSqueakMove) and (rawHitbox / 10) or rawHitbox
 	local hasSlammedLocker = false
 
-	local reboundingCount = self.Config.Rebounding or 0
+	local reboundingCount = cfg.Rebounding or 0
+	local moveSpeed = cfg.Speed or 50
 
 	for reboundCount = 0, reboundingCount do
-		if not mainPart or not mainPart.Parent then break end
+		if self.IsDead or not mainPart or not mainPart.Parent then break end
 
 		local isRebounding = (reboundCount % 2 == 1)
 		local startRoomIdx = isRebounding and #sortedRooms or 1
@@ -625,13 +643,13 @@ function Module:StartSpawn()
 		local step = isRebounding and -1 or 1
 
 		for roomIdx = startRoomIdx, endRoomIdx, step do
-			if not mainPart or not mainPart.Parent then break end
+			if self.IsDead or not mainPart or not mainPart.Parent then break end
 			local roomData = sortedRooms[roomIdx]
 			local roomModel = roomData.Model
 
-			if self.Config.BreakLight then
+			if cfg.BreakLight then
 				task.spawn(function()
-					breakRoomLights(self.Config, roomModel)
+					breakRoomLights(cfg, roomModel)
 				end)
 			end
 
@@ -644,16 +662,15 @@ function Module:StartSpawn()
 
 			local currentNode = entityNodes:FindFirstChild(startNodeName)
 
-			while currentNode and mainPart and mainPart.Parent do
-				local targetPos = currentNode.Position + Vector3.new(0, self.Config.HeightOfOffset or 0, 0)
+			while currentNode and mainPart and mainPart.Parent and not self.IsDead do
+				local targetPos = currentNode.Position + Vector3.new(0, heightOffset, 0)
 
 				while (mainPart.Position - targetPos).Magnitude > 1 do
 					local dt = RunService.RenderStepped:Wait()
-					if not mainPart or not mainPart.Parent then break end
+					if self.IsDead or not mainPart or not mainPart.Parent then break end
 
 					local direction = (targetPos - mainPart.Position).Unit
-					local speed = self.Config.Speed or 50
-					local moveStep = direction * speed * dt
+					local moveStep = direction * moveSpeed * dt
 
 					if (targetPos - mainPart.Position).Magnitude < moveStep.Magnitude then
 						mainPart.CFrame = CFrame.new(targetPos)
@@ -667,7 +684,7 @@ function Module:StartSpawn()
 					if hrp then
 						local inLocker = isPlayerInLocker()
 
-						if self.Config.PipSqueakMove and inLocker then
+						if cfg.PipSqueakMove and inLocker then
 							if not hasSlammedLocker then
 								local rayOrigin = mainPart.Position
 								local rayDirection = (hrp.Position - rayOrigin)
@@ -687,7 +704,7 @@ function Module:StartSpawn()
 
 									local targetCFrame = hrp.CFrame * CFrame.new(0, 0, 4)
 									local chaseDistance = (targetCFrame.Position - mainPart.Position).Magnitude
-									local duration = chaseDistance / (speed * 1.2)
+									local duration = chaseDistance / (moveSpeed * 1.2)
 									if duration <= 0 then duration = 0.05 end
 
 									local chaseTween = TweenService:Create(
@@ -700,10 +717,10 @@ function Module:StartSpawn()
 
 									caycaycay(0.577, 5.771, 1, 5, 5)
 
-									local waitTime = self.Config.PipSqueakDelay or 2
-									if self.Config.SoundSlamPipSqueak and self.Config.SoundSlamPipSqueak ~= "rbxassetid://0" and self.Config.SoundSlamPipSqueak ~= "" then
+									local waitTime = cfg.PipSqueakDelay or 2
+									if cfg.SoundSlamPipSqueak and cfg.SoundSlamPipSqueak ~= "rbxassetid://0" and cfg.SoundSlamPipSqueak ~= "" then
 										local slamSnd = Instance.new("Sound")
-										slamSnd.SoundId = self.Config.SoundSlamPipSqueak
+										slamSnd.SoundId = cfg.SoundSlamPipSqueak
 										slamSnd.Volume = 5
 										slamSnd.Parent = workspace
 										slamSnd:Play()
@@ -738,7 +755,7 @@ function Module:StartSpawn()
 							end
 						end
 
-						if self.Config.PandemoniumMove and not inLocker then
+						if cfg.PandemoniumMove and not inLocker then
 							local rayOrigin = mainPart.Position
 							local rayDirection = (hrp.Position - rayOrigin)
 
@@ -753,7 +770,7 @@ function Module:StartSpawn()
 								local movePart = (silenceModel and (silenceModel:FindFirstChild("Pandemonium") or silenceModel:FindFirstChildWhichIsA("BasePart"))) or mainPart
 								movePart.Anchored = true
 
-								while character and character:FindFirstChild("HumanoidRootPart") and not isPlayerInLocker() do
+								while character and character:FindFirstChild("HumanoidRootPart") and not isPlayerInLocker() and not self.IsDead do
 									local currentHrp = character.HumanoidRootPart
 									local distToPlayer = (currentHrp.Position - movePart.Position).Magnitude
 
