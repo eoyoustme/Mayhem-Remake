@@ -265,7 +265,7 @@ function Module:Debug(eventName)
 end
 
 function Module:KillPlayer()
-	if self.Callbacks["OnKillPlayer"] then
+	if self.Callbacks and self.Callbacks["OnKillPlayer"] then
 		self.Callbacks["OnKillPlayer"]()
 		return
 	end
@@ -273,7 +273,10 @@ function Module:KillPlayer()
 	local character = LocalPlayer.Character
 	if not character then return end
 
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	local currentHealth = 100
+
+	-- Lấy máu hiện tại từ UI
 	local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
 	if playerGui then
 		local mainGui = playerGui:FindFirstChild("Main")
@@ -284,11 +287,11 @@ function Module:KillPlayer()
 		end
 	end
 
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if humanoid and humanoid.Health > 0 then
 		currentHealth = math.max(currentHealth, humanoid.Health)
 	end
 
+	-- Tìm và gửi RemoteEvent tiêu diệt player
 	local damageRemote = ReplicatedStorage:FindFirstChild("LocalDamage", true) or ReplicatedStorage:FindFirstChild("ChangeHealth", true)
 
 	if damageRemote then
@@ -297,20 +300,51 @@ function Module:KillPlayer()
 		else
 			damageRemote:FireServer("Damage", currentHealth)
 		end
+	elseif humanoid then
+		-- Dự phòng nếu không tìm thấy RemoteEvent
+		humanoid.Health = 0
 	end
 
-	pcall(function()
-		task.spawn(function()
-			local pGui = LocalPlayer.PlayerGui
-			local entityPage = pGui.Main.AfterDeath.Document.EntityPage
+	-- Cập nhật thông tin UI Sau Khi Chết (Đã sửa pcall & nil check)
+	task.spawn(function()
+		pcall(function()
+			local cfg = self.Config or {}
+			local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+			if not pGui then return end
 
-			local imgLabel = entityPage.DeathFrame.Entities.Button.ImageLabel
-			if not self.Config.DeathImage or self.Config.DeathImage == "" or self.Config.DeathImage == "rbxassetid://0" then
-				imgLabel.BackgroundTransparency = 1
+			local mainGui = pGui:FindFirstChild("Main")
+			local afterDeath = mainGui and mainGui:FindFirstChild("AfterDeath")
+			local document = afterDeath and afterDeath:FindFirstChild("Document")
+			local entityPage = document and document:FindFirstChild("EntityPage")
+
+			if entityPage then
+				local deathFrame = entityPage:FindFirstChild("DeathFrame")
+				if deathFrame then
+					local entities = deathFrame:FindFirstChild("Entities")
+					local button = entities and entities:FindFirstChild("Button")
+					local imgLabel = button and button:FindFirstChild("ImageLabel")
+
+					if imgLabel then
+						if not cfg.DeathImage or cfg.DeathImage == "" or cfg.DeathImage == "rbxassetid://0" then
+							imgLabel.BackgroundTransparency = 1
+						else
+							imgLabel.BackgroundTransparency = 0
+							imgLabel.Image = cfg.DeathImage
+						end
+					end
+
+					if deathFrame:FindFirstChild("EntityName") then
+						deathFrame.EntityName.Text = cfg.DeathName or ""
+					end
+				end
 			end
-			imgLabel.Image = self.Config.DeathImage or ""
-			entityPage.DeathFrame.EntityName.Text = self.Config.DeathName or ""
-			pGui.Main.AfterDeath.Document.ScorePage.OverseerNotes.Text = self.Config.DeathNotes or ""
+
+			if document then
+				local scorePage = document:FindFirstChild("ScorePage")
+				if scorePage and scorePage:FindFirstChild("OverseerNotes") then
+					scorePage.OverseerNotes.Text = cfg.DeathNotes or ""
+				end
+			end
 		end)
 	end)
 end
