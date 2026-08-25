@@ -200,7 +200,11 @@ local CONST = {
 			CrucifixionOverwrite = nil,
 			OnFakeoutStart = function() end,
 			OnFakeoutEnd = function() end,
-			OnReboundStyle = function() end
+			OnReboundStyle = function() end,
+			-- MoveFastNotEnter Callbacks
+			OnNotReachedLatestRoom = function() end, -- Callback 1: Khi chưa tới lastroom (đang ở phòng trước lastroom)
+			OnReachedLatestRoom = function() end,    -- Callback 2: Khi tới được lastroom (chuyển về tốc độ Speed)
+			OnLeftLatestRoom = function() end        -- Callback 3: Khi rời từ lastroom sang phòng khác
 		}
 	}
 }
@@ -1631,10 +1635,12 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 				local room = GetRoomAtPoint(origin)
 				if room then
 					local index = tonumber(room.Name)
+					local prevRoomIndex = model:GetAttribute("LastEnteredRoom") or -1
+
 					if
 						index
 						and index >= 0
-						and index ~= model:GetAttribute("LastEnteredRoom")
+						and index ~= prevRoomIndex
 					then
 						model:SetAttribute("LastEnteredRoom", index)
 
@@ -1646,6 +1652,23 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 							if firstTime then
 								roomsEntered:SetAttribute(room.Name, true)
+							end
+
+							-- Xử lý CallbacksMoveFastNotEnter
+							if config.Movement and config.Movement.MoveFastNotEnter then
+								local latestRoom = GetCurrentRoom(true)
+								local latestNum = latestRoom and tonumber(latestRoom.Name) or 0
+
+								if index < latestNum then
+									-- Callback 1: Chưa tới lastroom
+									task.spawn(entity.RunCallback, entity, "OnNotReachedLatestRoom", room, latestRoom)
+								elseif index == latestNum then
+									-- Callback 2: Tới lastroom (tốc độ tự trả về Speed chuẩn)
+									task.spawn(entity.RunCallback, entity, "OnReachedLatestRoom", room)
+								elseif prevRoomIndex == latestNum and index > latestNum then
+									-- Callback 3: Rời lastroom chuyển sang phòng khác
+									task.spawn(entity.RunCallback, entity, "OnLeftLatestRoom", room)
+								end
 							end
 
 							local latestRoom = GetCurrentRoom(true)
@@ -1730,7 +1753,6 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 				end
 			end
 
-			-- FIX: CameraShaker được làm mới an toàn cho cả Entity chính và Rebound Clone
 			do
 				local camShake = config.CameraShake
 				if camShake and camShake.Enabled then
