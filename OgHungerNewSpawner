@@ -80,6 +80,7 @@ local CONST = {
 				Speed = 100,
 				SpeedFast = 370,
 				MoveFastNotEnter = false,
+				IsMoveWhenWHere = false, -- [NEW SETTING] Bật/Tắt tính năng spawn ở Multi model và tìm node gần nhất
 				Delay = 2,
 				Reversed = false,
 				EndWhenEnterLatestRoom = false,
@@ -201,10 +202,9 @@ local CONST = {
 			OnFakeoutStart = function() end,
 			OnFakeoutEnd = function() end,
 			OnReboundStyle = function() end,
-			-- MoveFastNotEnter Callbacks
-			OnNotReachedLatestRoom = function() end, -- Callback 1: Khi chưa tới lastroom (đang ở phòng trước lastroom)
-			OnReachedLatestRoom = function() end,    -- Callback 2: Khi tới được lastroom (chuyển về tốc độ Speed)
-			OnLeftLatestRoom = function() end        -- Callback 3: Khi rời từ lastroom sang phòng khác
+			OnNotReachedLatestRoom = function() end,
+			OnReachedLatestRoom = function() end,
+			OnLeftLatestRoom = function() end
 		}
 	}
 }
@@ -214,6 +214,42 @@ local Module = {
 }
 
 -- \\ Helper Functions // --
+
+local function GetMultiModelTarget(): BasePart?
+	local targetNames = {"MultiMoving", "Multiper", "Multiilence", "MultiBound", "MultiGod"}
+	for _, name in ipairs(targetNames) do
+		local model = workspace:FindFirstChild(name)
+		if model then
+			local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
+			if part then
+				return part
+			end
+		end
+	end
+	return nil
+end
+
+local function FilterNodesFromNearest(pathfindNodes: { BasePart }, startPos: Vector3): { BasePart }
+	if #pathfindNodes == 0 then return pathfindNodes end
+	local closestIndex = 1
+	local minDistance = math.huge
+
+	for i, node in ipairs(pathfindNodes) do
+		if node and node.Parent then
+			local dist = (node.Position - startPos).Magnitude
+			if dist < minDistance then
+				minDistance = dist
+				closestIndex = i
+			end
+		end
+	end
+
+	local trimmed = {}
+	for i = closestIndex, #pathfindNodes do
+		table.insert(trimmed, pathfindNodes[i])
+	end
+	return trimmed
+end
 
 local function GetSortedRooms(): { Model }
 	local rooms = CurrentRooms:GetChildren()
@@ -1462,8 +1498,19 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 		end)
 	end
 
-	local spawnPoint: BasePart? = nil
-	do
+	local spawnCFrame: CFrame? = nil
+
+	-- Kiểm tra nếu IsMoveWhenWHere = true thì tìm 1 trong 5 Model để PivotTo
+	if config.Movement and config.Movement.IsMoveWhenWHere then
+		local multiTarget = GetMultiModelTarget()
+		if multiTarget then
+			spawnCFrame = multiTarget.CFrame
+		end
+	end
+
+	-- Nếu IsMoveWhenWHere = false hoặc không tìm thấy Model thì dùng Spawn Point mặc định
+	if not spawnCFrame then
+		local spawnPoint: BasePart? = nil
 		local rooms = GetSortedRooms()
 		local latestRoom = GetCurrentRoom(true)
 		if config.Movement.Reversed then
@@ -1475,12 +1522,14 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 		else
 			spawnPoint = rooms[1]:FindFirstChild("RoomEntrance")
 		end
-	end
-	if not spawnPoint then
-		error(string.format(debug.traceback("Failed to find spawn point for entity: '%s'"), config.Entity.Name))
+
+		if not spawnPoint then
+			error(string.format(debug.traceback("Failed to find spawn point for entity: '%s'"), config.Entity.Name))
+		end
+		spawnCFrame = spawnPoint.CFrame
 	end
 
-	model:PivotTo(spawnPoint.CFrame + Vector3.new(0, config.Entity.HeightOffset, 0))
+	model:PivotTo(spawnCFrame + Vector3.new(0, config.Entity.HeightOffset, 0))
 	model.Parent = workspace
 	task.spawn(entity.RunCallback, entity, "OnSpawned")
 
@@ -1654,19 +1703,15 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 								roomsEntered:SetAttribute(room.Name, true)
 							end
 
-							-- Xử lý CallbacksMoveFastNotEnter
 							if config.Movement and config.Movement.MoveFastNotEnter then
 								local latestRoom = GetCurrentRoom(true)
 								local latestNum = latestRoom and tonumber(latestRoom.Name) or 0
 
 								if index < latestNum then
-									-- Callback 1: Chưa tới lastroom
 									task.spawn(entity.RunCallback, entity, "OnNotReachedLatestRoom", room, latestRoom)
 								elseif index == latestNum then
-									-- Callback 2: Tới lastroom (tốc độ tự trả về Speed chuẩn)
 									task.spawn(entity.RunCallback, entity, "OnReachedLatestRoom", room)
 								elseif prevRoomIndex == latestNum and index > latestNum then
-									-- Callback 3: Rời lastroom chuyển sang phòng khác
 									task.spawn(entity.RunCallback, entity, "OnLeftLatestRoom", room)
 								end
 							end
@@ -1789,6 +1834,11 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 		if reboundType == "AMBUSH" then
 			local pathfindNodes = GetPathfindNodesAmbush(config)
 
+			-- Nếu IsMoveWhenWHere = true thì lọc lại các node để bắt đầu di chuyển từ node gần với vị trí đã PivotTo nhất
+			if config.Movement and config.Movement.IsMoveWhenWHere then
+				pathfindNodes = FilterNodesFromNearest(pathfindNodes, model:GetPivot().Position)
+			end
+
 			local roomAddedConn
 			roomAddedConn = CurrentRooms.ChildAdded:Connect(function(newRoom)
 				task.spawn(function()
@@ -1871,6 +1921,10 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 		elseif reboundType == "BLITZ" then
 			local nodesToCurrent, _ = GetPathfindNodesBlitz(config)
+
+			if config.Movement and config.Movement.IsMoveWhenWHere then
+				nodesToCurrent = FilterNodesFromNearest(nodesToCurrent, model:GetPivot().Position)
+			end
 
 			for _, n in next, nodesToCurrent do
 				if model:GetAttribute("IsChasing") then break end
