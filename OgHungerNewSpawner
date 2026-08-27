@@ -1329,7 +1329,7 @@ LocalPlayer.CharacterAdded:Connect(OnCharacterAdded)
 
 Module.Create = function(self, config: any): any?
 	local newConfig = ApplyConfigDefaults(config, CONST.DEFAULT.CONFIG)
-
+	
 	if not config._speedProcessed then
 		newConfig.Movement.Speed = CONST.BASE_ENTITY_SPEED / 100 * config.Movement.Speed
 		if config.Movement and config.Movement.SpeedFast then
@@ -1507,8 +1507,8 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 		task.spawn(entity.RunCallback, entity, "OnFakeoutStart")
 
 		-- 1. Tween 10 giây lùi xuống -100 stud (Quad In)
-		local downCFrame = targetSpawnCFrame - Vector3.new(0, 100, 0)
-		EntityMoveToTweenCustom(model, downCFrame, 10, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		local downCFrame = targetSpawnCFrame - Vector3.new(0, 20, 0)
+		EntityMoveToTweenCustom(model, downCFrame, 2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
 		-- Phát EndSound nếu có
 		if fakeoutConfig.EndSound and fakeoutConfig.EndSound ~= "" and fakeoutConfig.EndSound ~= "rbxassetid://" and fakeoutConfig.EndSound ~= "rbxassetid://0" then
