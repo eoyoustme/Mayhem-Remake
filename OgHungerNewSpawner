@@ -80,7 +80,7 @@ local CONST = {
 				Speed = 100,
 				SpeedFast = 370,
 				MoveFastNotEnter = false,
-				IsMoveWhenWHere = false, -- [NEW SETTING] Bật/Tắt tính năng spawn ở Multi model và tìm node gần nhất
+				IsMoveWhenWHere = false,
 				Delay = 2,
 				Reversed = false,
 				EndWhenEnterLatestRoom = false,
@@ -216,13 +216,17 @@ local Module = {
 -- \\ Helper Functions // --
 
 local function GetMultiModelTarget(): BasePart?
-	local targetNames = {"MultiMoving", "Multiper", "Multiilence", "MultiBound", "MultiGod"}
+	local targetNames = {"Multimoving", "Multiper", "Multiilence", "MultiBound", "MultiGod"}
 	for _, name in ipairs(targetNames) do
-		local model = workspace:FindFirstChild(name)
-		if model then
-			local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
-			if part then
-				return part
+		local foundObj = workspace:FindFirstChild(name, true)
+		if foundObj then
+			if foundObj:IsA("BasePart") then
+				return foundObj
+			elseif foundObj:IsA("Model") then
+				local part = foundObj.PrimaryPart or foundObj:FindFirstChildWhichIsA("BasePart", true)
+				if part then
+					return part
+				end
 			end
 		end
 	end
@@ -1500,7 +1504,6 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 	local spawnCFrame: CFrame? = nil
 
-	-- Kiểm tra nếu IsMoveWhenWHere = true thì tìm 1 trong 5 Model để PivotTo
 	if config.Movement and config.Movement.IsMoveWhenWHere then
 		local multiTarget = GetMultiModelTarget()
 		if multiTarget then
@@ -1508,7 +1511,6 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 		end
 	end
 
-	-- Nếu IsMoveWhenWHere = false hoặc không tìm thấy Model thì dùng Spawn Point mặc định
 	if not spawnCFrame then
 		local spawnPoint: BasePart? = nil
 		local rooms = GetSortedRooms()
@@ -1810,7 +1812,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 						cloned[1] = camShake.Values[1] / camShake.Range * (camShake.Range - mag)
 						cloned[2] = camShake.Values[2] / camShake.Range * (camShake.Range - mag)
-						
+
 						pcall(function()
 							local shaker = Modules.Main_Game.camShaker
 							if not shaker then
@@ -1834,9 +1836,14 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 		if reboundType == "AMBUSH" then
 			local pathfindNodes = GetPathfindNodesAmbush(config)
 
-			-- Nếu IsMoveWhenWHere = true thì lọc lại các node để bắt đầu di chuyển từ node gần với vị trí đã PivotTo nhất
 			if config.Movement and config.Movement.IsMoveWhenWHere then
-				pathfindNodes = FilterNodesFromNearest(pathfindNodes, model:GetPivot().Position)
+				local multiTarget = GetMultiModelTarget()
+				if multiTarget then
+					model:PivotTo(multiTarget.CFrame + Vector3.new(0, config.Entity.HeightOffset, 0))
+					pathfindNodes = FilterNodesFromNearest(pathfindNodes, multiTarget.Position)
+				else
+					pathfindNodes = FilterNodesFromNearest(pathfindNodes, model:GetPivot().Position)
+				end
 			end
 
 			local roomAddedConn
@@ -1923,7 +1930,13 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 			local nodesToCurrent, _ = GetPathfindNodesBlitz(config)
 
 			if config.Movement and config.Movement.IsMoveWhenWHere then
-				nodesToCurrent = FilterNodesFromNearest(nodesToCurrent, model:GetPivot().Position)
+				local multiTarget = GetMultiModelTarget()
+				if multiTarget then
+					model:PivotTo(multiTarget.CFrame + Vector3.new(0, config.Entity.HeightOffset, 0))
+					nodesToCurrent = FilterNodesFromNearest(nodesToCurrent, multiTarget.Position)
+				else
+					nodesToCurrent = FilterNodesFromNearest(nodesToCurrent, model:GetPivot().Position)
+				end
 			end
 
 			for _, n in next, nodesToCurrent do
