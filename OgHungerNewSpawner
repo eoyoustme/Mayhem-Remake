@@ -1,7 +1,7 @@
 --[[
    ____   _____   _    _ _  _ _  _  _____ ______ _____    _  _ _____  _  _ 
   / __ \ / ____| | |  | | || | || |/ ____|  ____|  __ \  | || |  ____|| || |
- | |  | | |  __  | |__| | || | || | |  __| |__  | |__) | | || |  __   | || |
+ | |  | | |  __  | |__| | || | || | |  __| |__  | |__) | | || | |__   | || |
  | |  | | | |_ | |  __  | || | || | | |_ |  __| |  _  /  | || |  __|  | || |
  | |__| | |__| | | |  | | || | || | |__| | |____| | \ \  | || | |____ | || |
   \____/ \_____| |_|  |_|\_/\_/\_/\_/_____|______|_|  \_\  \_/\_/|______|\_/\_/ 
@@ -40,13 +40,10 @@ local Assets = {
 	Repentance = LoadCustomInstance(ROOT.."/Assets/Repentance.rbxm"),
 	Earthquake = LoadCustomInstance(ROOT.."/Assets/Earthquake.rbxm")
 }
-
-local mainGameModule = PlayerGui:WaitForChild("MainUI", 5) and PlayerGui.MainUI:FindFirstChild("Initiator") and PlayerGui.MainUI.Initiator:FindFirstChild("Main_Game")
 local Modules = {
 	Module_Events = require(ReplicatedStorage.ModulesClient.Module_Events :: ModuleScript),
-	Main_Game = mainGameModule and require(mainGameModule :: ModuleScript) or {}
+	Main_Game = require(PlayerGui.MainUI.Initiator.Main_Game :: ModuleScript)
 }
-
 local Storage = {
 	Ambient = {},
 	DeathTypes = {
@@ -94,15 +91,15 @@ local CONST = {
 				ReboundStyleSound = "rbxassetid://0",
 				ReboundStyleVolume = 1,
 				ReboundStyleDelay = 2,
-				FasterAndFaster = false,
+				FasterAndFaster = false, -- Tùy chọn tăng tốc 1.3x mỗi khi qua phòng mới
 				ChasePlayerWhenSee = false,
 				SpeedWhenChase = 7.5,
 				Fakeout = {
 					Enabled = false,
 					RandomFakeout = false,
 					EndSound = "rbxassetid://0",
-					EndDelay = 2,
-					SpeedMultiplier = 1
+					EndDelay = 1,
+					SpeedMultiplier = 2
 				}
 			},
 			Damage = {
@@ -466,16 +463,13 @@ local function PlayRipperJumpscare(entity: any)
 		end
 
 		pcall(function()
-			local camShakerMod = ReplicatedStorage:FindFirstChild("CameraShaker", true)
-			if camShakerMod then
-				local CameraShaker = require(camShakerMod)
-				local camShake = CameraShaker.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
-					local curCam = workspace.CurrentCamera
-					if curCam then curCam.CFrame = curCam.CFrame * shakeCf end
-				end)
-				camShake:Start()
-				camShake:ShakeOnce(15, 25, 0, 2, 1, 6)
-			end
+			local CameraShaker = require(ReplicatedStorage:WaitForChild("CameraShaker"))
+			local camShake = CameraShaker.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
+				local curCam = workspace.CurrentCamera
+				if curCam then curCam.CFrame = curCam.CFrame * shakeCf end
+			end)
+			camShake:Start()
+			camShake:ShakeOnce(15, 25, 0, 2, 1, 6)
 		end)
 
 		camera.CameraType = Enum.CameraType.Scriptable
@@ -662,10 +656,7 @@ local function OnCharacterAdded(char: Model)
 	Humanoid = char:WaitForChild("Humanoid")
 	RootPart = char.PrimaryPart or char:FindFirstChildWhichIsA("BasePart")
 
-	local mainGame = PlayerGui:WaitForChild("MainUI", 5) and PlayerGui.MainUI:FindFirstChild("Initiator") and PlayerGui.MainUI.Initiator:FindFirstChild("Main_Game")
-	if mainGame then
-		Modules.Main_Game = require(mainGame :: ModuleScript)
-	end
+	Modules.Main_Game = require(PlayerGui:WaitForChild("MainUI").Initiator.Main_Game :: ModuleScript)
 end
 
 local function GetRoomAtPoint(vector3: Vector3): Model?
@@ -774,12 +765,9 @@ local function CrucifixEntity(entity: any)
 
 	model:SetAttribute("BeingBanished", true)
 
-	local MainGame = Modules.Main_Game
-	local CamShaker = MainGame and MainGame.camShaker
-	local TheShake
-	if CamShaker then
-		TheShake = CamShaker:StartShake(5, 20, 2, Vector3.zero)
-	end
+	local MainGame = require(PlayerGui.MainUI.Initiator.Main_Game :: ModuleScript)
+	local CamShaker = MainGame.camShaker
+	local TheShake = CamShaker:StartShake(5, 20, 2, Vector3.zero)
 
 	local Repentance = Assets.Repentance:Clone()
 	local Crucifix = Repentance.Crucifix
@@ -906,7 +894,7 @@ local function CrucifixEntity(entity: any)
 				{ Brightness = 15, Range = 40 }
 			):Play()
 
-			if TheShake then TheShake:StartFadeOut(3) end
+			TheShake:StartFadeOut(3)
 			fadeOut()
 
 			TweenService:Create(
@@ -956,7 +944,7 @@ local function CrucifixEntity(entity: any)
 			{ Brightness = 0, Range = 0, Color = Color3.fromRGB(255, 116, 130) }
 		):Play()
 
-		if TheShake then TheShake:StartFadeOut(3) end
+		TheShake:StartFadeOut(3)
 
 		task.spawn(function()
 			local color = Instance.new("Color3Value")
@@ -1005,7 +993,7 @@ local function CrucifixEntity(entity: any)
 
 	if not resist then
 		Handle.ExplodeParticle:Emit(math.random(20, 30))
-		if CamShaker then CamShaker:ShakeOnce(7.5, 7.5, 0.25, 1.5) end
+		CamShaker:ShakeOnce(7.5, 7.5, 0.25, 1.5)
 	else
 		model:SetAttribute("BeingBanished", false)
 		model:SetAttribute("Paused", false)
@@ -1240,7 +1228,7 @@ local function EntityMoveToSpeed(model: Model, cframe: CFrame, speedInput: any)
 	repeat RunService.Stepped:Wait() until reached or not model or not model.Parent or model:GetAttribute("IsChasing")
 end
 
-local function EntityMoveToTweenCustom(model: Model, targetCFrame: CFrame, duration: number, easingStyle: Enum.EasingStyle, easingDirection: Enum.EasingDirection)
+local function EntityMoveToTween(model: Model, targetCFrame: CFrame, duration: number)
 	if not model or not model.Parent then return end
 	local startPivot = model:GetPivot()
 	local elapsed = 0
@@ -1260,22 +1248,20 @@ local function EntityMoveToTweenCustom(model: Model, targetCFrame: CFrame, durat
 			return
 		end
 
-		elapsed = elapsed + step
-		local alpha = math.clamp(elapsed / math.max(duration, 0.01), 0, 1)
-		local tweenAlpha = TweenService:GetValue(alpha, easingStyle or Enum.EasingStyle.Quad, easingDirection or Enum.EasingDirection.InOut)
-		model:PivotTo(startPivot:Lerp(targetCFrame, tweenAlpha))
+		if not model:GetAttribute("Paused") then
+			elapsed = elapsed + step
+			local alpha = math.clamp(elapsed / math.max(duration, 0.01), 0, 1)
+			local quadAlpha = TweenService:GetValue(alpha, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+			model:PivotTo(startPivot:Lerp(targetCFrame, quadAlpha))
 
-		if alpha >= 1 then
-			connection:Disconnect()
-			reached = true
+			if alpha >= 1 then
+				connection:Disconnect()
+				reached = true
+			end
 		end
 	end)
 
 	repeat RunService.Stepped:Wait() until reached or not model or not model.Parent or model:GetAttribute("IsChasing")
-end
-
-local function EntityMoveToTween(model: Model, targetCFrame: CFrame, duration: number)
-	EntityMoveToTweenCustom(model, targetCFrame, duration, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
 end
 
 local function EntityMoveTo(model: Model, cframe: CFrame, config: any)
@@ -1290,10 +1276,8 @@ end
 
 local function Earthquake()
 	pcall(function()
-		if Modules.Main_Game and Modules.Main_Game.camShaker then
-			Modules.Main_Game.camShaker:ShakeOnce(4, 12, 1, 5)
-			Modules.Main_Game.camShaker:ShakeOnce(10, 2, 3, 3)
-		end
+		Modules.Main_Game.camShaker:ShakeOnce(4, 12, 1, 5)
+		Modules.Main_Game.camShaker:ShakeOnce(10, 2, 3, 3)
 	end)
 	Assets.Earthquake.SoundEarthquake:Play()
 	local v5 = CollectionService:GetTagged("PartCeiling")
@@ -1329,13 +1313,9 @@ LocalPlayer.CharacterAdded:Connect(OnCharacterAdded)
 
 Module.Create = function(self, config: any): any?
 	local newConfig = ApplyConfigDefaults(config, CONST.DEFAULT.CONFIG)
-
-	if not config._speedProcessed then
-		newConfig.Movement.Speed = CONST.BASE_ENTITY_SPEED / 100 * config.Movement.Speed
-		if config.Movement and config.Movement.SpeedFast then
-			newConfig.Movement.SpeedFast = CONST.BASE_ENTITY_SPEED / 100 * config.Movement.SpeedFast
-		end
-		newConfig._speedProcessed = true
+	newConfig.Movement.Speed = CONST.BASE_ENTITY_SPEED / 100 * config.Movement.Speed
+	if config.Movement and config.Movement.SpeedFast then
+		newConfig.Movement.SpeedFast = CONST.BASE_ENTITY_SPEED / 100 * config.Movement.SpeedFast
 	end
 
 	local asset = newConfig.Entity.Asset
@@ -1443,15 +1423,90 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 	end
 
 	if entity.Model:GetAttribute("Running") then return end
+	do
+		local rebounding = entity.Config.Rebounding
+		if
+			rebounding.Enabled
+			and (
+				rebounding.Min <= 0
+					or rebounding.Max <= 0
+					or rebounding.Min > rebounding.Max
+			)
+		then
+			error(string.format(
+				debug.traceback("Invalid rebounding minmax values: %s - %s"),
+				rebounding.Min,
+				rebounding.Max
+				))
+		end
+	end
 
 	local model = entity.Model
 	local config = entity.Config
 	local debug = entity.Debug
 
+	local isFakeout = false
+	local fakeoutConfig = config.Movement and config.Movement.Fakeout
+	if fakeoutConfig and fakeoutConfig.Enabled and not model:GetAttribute("FakeoutFinished") then
+		if fakeoutConfig.RandomFakeout then
+			if typeof(fakeoutConfig.RandomFakeout) == "number" then
+				isFakeout = (math.random(1, 100) <= fakeoutConfig.RandomFakeout)
+			else
+				isFakeout = (math.random(1, 2) == 1)
+			end
+		else
+			isFakeout = true
+		end
+	end
+
+	if isFakeout then
+		model:SetAttribute("IsFakeout", true)
+		model:SetAttribute("Damage", false)
+		task.spawn(entity.RunCallback, entity, "OnFakeoutStart")
+	end
+
 	model:SetAttribute("Running", true)
 	self.ActiveEntities[#self.ActiveEntities + 1] = entity
 
-	-- TÍNH TOÁN VỊ TRÍ SPAWN BAN ĐẦU
+	if config.Movement.ReboundMoveStyle and not isReboundRespawn and not model:GetAttribute("ReboundStyleStarted") then
+		model:SetAttribute("ReboundStyleStarted", true)
+
+		task.spawn(function()
+			local times = math.clamp(tonumber(config.Movement.ReboundStyleTimes) or 1, 1, 7)
+			local soundId = config.Movement.ReboundStyleSound
+			local volume = config.Movement.ReboundStyleVolume or 1
+			local spawnedCount = 0
+
+			local connection
+			connection = CurrentRooms.ChildAdded:Connect(function(newRoom)
+				if spawnedCount >= times then
+					if connection then connection:Disconnect() end
+					return
+				end
+
+				spawnedCount = spawnedCount + 1
+
+				if soundId and soundId ~= "" and soundId ~= "rbxassetid://" and soundId ~= "rbxassetid://0" then
+					local sound = Instance.new("Sound")
+					sound.SoundId = soundId
+					sound.Volume = volume
+					sound.Parent = workspace
+					sound:Play()
+					Debris:AddItem(sound, 5)
+				end
+
+				task.delay(0.2, function()
+					local newEntity = Module:Create(config)
+					if newEntity then
+						newEntity.Debug = CloneTable(entity.Debug)
+						task.spawn(entity.RunCallback, entity, "OnReboundStyle", newEntity)
+						Module:Run(newEntity, false, true)
+					end
+				end)
+			end)
+		end)
+	end
+
 	local spawnCFrame: CFrame? = nil
 
 	if config.Movement and config.Movement.IsMoveWhenWHere then
@@ -1481,101 +1536,54 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 		spawnCFrame = spawnPoint.CFrame
 	end
 
-	local targetSpawnCFrame = spawnCFrame + Vector3.new(0, config.Entity.HeightOffset, 0)
-	model:PivotTo(targetSpawnCFrame)
+	model:PivotTo(spawnCFrame + Vector3.new(0, config.Entity.HeightOffset, 0))
 	model.Parent = workspace
 	task.spawn(entity.RunCallback, entity, "OnSpawned")
 
-	-- XỬ LÝ FAKEOUT NGAY TẠI THỜI ĐIỂM SPAWN
-	local isFakeout = false
-	local fakeoutConfig = config.Movement and config.Movement.Fakeout
-	if fakeoutConfig and fakeoutConfig.Enabled and not model:GetAttribute("FakeoutFinished") then
-		if fakeoutConfig.RandomFakeout then
-			if typeof(fakeoutConfig.RandomFakeout) == "number" then
-				isFakeout = (math.random(1, 100) <= fakeoutConfig.RandomFakeout)
-			else
-				isFakeout = (math.random(1, 2) == 1)
-			end
-		else
-			isFakeout = true
-		end
-	end
-
-	if isFakeout then
-		model:SetAttribute("IsFakeout", true)
-		model:SetAttribute("Damage", false)
-		task.spawn(entity.RunCallback, entity, "OnFakeoutStart")
-
-		local downCFrame = targetSpawnCFrame - Vector3.new(0, 20, 0)
-		EntityMoveToTweenCustom(model, downCFrame, 2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-
-		if fakeoutConfig.EndSound and fakeoutConfig.EndSound ~= "" and fakeoutConfig.EndSound ~= "rbxassetid://" and fakeoutConfig.EndSound ~= "rbxassetid://0" then
-			local sound = Instance.new("Sound")
-			sound.SoundId = fakeoutConfig.EndSound
-			sound.Volume = 1
-			sound.Parent = workspace
-			sound:Play()
-			Debris:AddItem(sound, 5)
-		end
-
-		task.spawn(entity.RunCallback, entity, "OnFakeoutEnd")
-
-		local endDelay = fakeoutConfig.EndDelay or 1
-		task.wait(endDelay)
-
-		EntityMoveToTweenCustom(model, targetSpawnCFrame, 0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
-		model:SetAttribute("IsFakeout", false)
-		model:SetAttribute("FakeoutFinished", true)
-		model:SetAttribute("Damage", true)
-	end
-
-	-- XỬ LÝ REBOUND MOVE STYLE (ĐÃ FIX TRIỆT ĐỂ BẰNG CLONECONFIG VÀ RESET RUNNING)
-	if config.Movement.ReboundMoveStyle and not model:GetAttribute("ReboundStyleStarted") then
-		model:SetAttribute("ReboundStyleStarted", true)
-
+	if not isReboundRespawn and config.Spawned and config.Spawned.ChangeColorWhenSpawn then
 		task.spawn(function()
-			local times = math.clamp(tonumber(config.Movement.ReboundStyleTimes) or 1, 1, 7)
-			local soundId = config.Movement.ReboundStyleSound
-			local volume = config.Movement.ReboundStyleVolume or 1
-			local spawnedCount = 0
+			local colorCorrection = Lighting:FindFirstChild("MainColorCorrection")
+			if not colorCorrection then
+				colorCorrection = Instance.new("ColorCorrectionEffect")
+				colorCorrection.Name = "MainColorCorrection"
+				colorCorrection.Parent = Lighting
+			end
 
-			local connection
-			connection = CurrentRooms.ChildAdded:Connect(function(newRoom)
-				if spawnedCount >= times then
-					if connection then connection:Disconnect() end
-					return
-				end
+			if config.Spawned.Rainbow then
+				colorCorrection.TintColor = Color3.fromRGB(255, 255, 255)
+				colorCorrection.Contrast = 0.1
 
-				local entrance = newRoom:WaitForChild("RoomEntrance", 3)
-				if not entrance then return end
+				TweenService:Create(colorCorrection, TweenInfo.new(2.5), {Contrast = 0}):Play()
 
-				spawnedCount = spawnedCount + 1
+				local redTween = TweenService:Create(colorCorrection, TweenInfo.new(5), {TintColor = Color3.fromRGB(250, 0, 0)})
+				redTween:Play()
 
-				if soundId and soundId ~= "" and soundId ~= "rbxassetid://" and soundId ~= "rbxassetid://0" then
-					local sound = Instance.new("Sound")
-					sound.SoundId = soundId
-					sound.Volume = volume
-					sound.Parent = workspace
-					sound:Play()
-					Debris:AddItem(sound, 5)
-				end
+				task.wait(0.5)
 
-				task.delay(config.Movement.ReboundStyleDelay or 2, function()
-					if entity:IsAlive() then
-						local clonedConfig = CloneTable(config)
-						local newEntity = Module:Create(clonedConfig)
-						if newEntity then
-							newEntity.Debug = CloneTable(entity.Debug)
-							task.spawn(entity.RunCallback, entity, "OnReboundStyle", newEntity)
+				local colors = {
+					Color3.fromRGB(255, 255, 0),  
+					Color3.fromRGB(0, 0, 255),    
+					Color3.fromRGB(0, 255, 0),   
+					Color3.fromRGB(255, 105, 180)  
+				}
 
-							local cloneModel = newEntity.Model
-							cloneModel:SetAttribute("Running", false)
-							Module:Run(newEntity, false, true)
-						end
+				for _ = 1, 2 do
+					for _, color in ipairs(colors) do
+						local tween = TweenService:Create(colorCorrection, TweenInfo.new(0.35), {TintColor = color})
+						tween:Play()
+						task.wait(0.25)
 					end
-				end)
-			end)
+				end  
+
+				local finalRed = TweenService:Create(colorCorrection, TweenInfo.new(1), {TintColor = Color3.fromRGB(255, 255, 255)})
+				finalRed:Play()
+			else
+				colorCorrection.TintColor = config.Spawned.Color
+				colorCorrection.Contrast = 1
+				TweenService:Create(colorCorrection, TweenInfo.new(0.5), {Contrast = 0}):Play()
+				local TW = TweenService:Create(colorCorrection, TweenInfo.new(5), {TintColor = Color3.fromRGB(255, 255, 255)})
+				TW:Play()
+			end
 		end)
 	end
 
@@ -1607,10 +1615,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 			if model:GetAttribute("Paused") then continue end
 
 			local origin = model:GetPivot().Position
-			local char = LocalPlayer.Character
-			local root = char and (char.PrimaryPart or char:FindFirstChild("HumanoidRootPart"))
-			if not root then continue end
-			local charOrigin = root.Position
+			local charOrigin = RootPart.Position
 
 			local inSight = false
 			if (charOrigin - origin).Magnitude <= config.Damage.Range then
@@ -1700,6 +1705,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 					then
 						model:SetAttribute("LastEnteredRoom", index)
 
+						-- Tăng tốc 1.3x khi qua phòng mới nếu bật FasterAndFaster
 						if config.Movement and config.Movement.FasterAndFaster then
 							local mult = typeof(config.Movement.FasterAndFaster) == "number" and config.Movement.FasterAndFaster or 1.3
 							config.Movement.Speed = config.Movement.Speed * mult
@@ -1770,7 +1776,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 			if
 				not model:GetAttribute("Paused")
 				and not usedCrucifix
-				and not model:GetAttribute("IsFakeout")
+				and not isFakeout
 			then
 				local damage = config.Damage
 				local ripper = damage.JumpscareRipper
@@ -1813,41 +1819,36 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 				end
 			end
 
+			-- Sửa lỗi CameraShakers chạy mượt trên cả Clone
 			do
 				local camShake = config.CameraShake
 				if camShake and camShake.Enabled then
 					local mag = (charOrigin - origin).Magnitude
-					local range = camShake.Range or 100
-					if mag <= range and range > 0 then
+					if mag <= camShake.Range then
 						local now = tick()
 						if now - lastShakeTick >= (camShake.Values[3] or 0.1) then
 							lastShakeTick = now
 
-							local scale = math.clamp((range - mag) / range, 0, 1)
-							local val1 = (camShake.Values[1] or 1.5) * scale
-							local val2 = (camShake.Values[2] or 20) * scale
-							local val3 = camShake.Values[3] or 0.1
-							local val4 = camShake.Values[4] or 1
+							local cloned = {}
+							for i, v in next, camShake.Values do
+								cloned[i] = v
+							end
+
+							cloned[1] = camShake.Values[1] / camShake.Range * (camShake.Range - mag)
+							cloned[2] = camShake.Values[2] / camShake.Range * (camShake.Range - mag)
 
 							pcall(function()
-								local shaker = Modules.Main_Game and Modules.Main_Game.camShaker
+								local shaker = Modules.Main_Game.camShaker
 								if not shaker then
-									local camShakerMod = ReplicatedStorage:FindFirstChild("CameraShaker", true)
-									if camShakerMod then
-										local CameraShaker = require(camShakerMod)
-										shaker = CameraShaker.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
-											local curCam = workspace.CurrentCamera
-											if curCam then curCam.CFrame = curCam.CFrame * shakeCf end
-										end)
-										shaker:Start()
-										if Modules.Main_Game then
-											Modules.Main_Game.camShaker = shaker
-										end
-									end
+									local CameraShaker = require(ReplicatedStorage:WaitForChild("CameraShaker"))
+									shaker = CameraShaker.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
+										local curCam = workspace.CurrentCamera
+										if curCam then curCam.CFrame = curCam.CFrame * shakeCf end
+									end)
+									shaker:Start()
+									Modules.Main_Game.camShaker = shaker
 								end
-								if shaker then
-									shaker:ShakeOnce(val1, val2, val3, val4)
-								end
+								shaker:ShakeOnce(table.unpack(cloned))
 							end)
 						end
 					end
@@ -1873,6 +1874,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 			local roomAddedConn
 			roomAddedConn = CurrentRooms.ChildAdded:Connect(function(newRoom)
+				-- Nếu Reversed = true thì không di chuyển tới phòng mới khi phòng mới xuất hiện
 				if config.Movement and config.Movement.Reversed then return end
 
 				task.spawn(function()
@@ -2035,6 +2037,55 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 		if model:GetAttribute("IsChasing") then
 			repeat task.wait(0.2) until not entity:IsAlive()
+		end
+
+		-- Xử lý Fakeout trên chính Entity chính
+		if isFakeout then
+			model:SetAttribute("Paused", true)
+			model:SetAttribute("Damage", false)
+
+			local originalPivot = model:GetPivot()
+			local downCFrame = originalPivot - Vector3.new(0, 300, 0)
+
+			-- Tween 5s in Quad xuống -300 Y
+			EntityMoveToTween(model, downCFrame, 5)
+
+			-- Phát EndSound
+			if fakeoutConfig.EndSound and fakeoutConfig.EndSound ~= "" and fakeoutConfig.EndSound ~= "rbxassetid://" and fakeoutConfig.EndSound ~= "rbxassetid://0" then
+				local sound = Instance.new("Sound")
+				sound.SoundId = fakeoutConfig.EndSound
+				sound.Volume = 1
+				sound.Parent = workspace
+				sound:Play()
+				Debris:AddItem(sound, 5)
+			end
+
+			task.spawn(entity.RunCallback, entity, "OnFakeoutEnd")
+
+			local endDelay = fakeoutConfig.EndDelay or 1
+			task.wait(endDelay)
+
+			-- Tween trở lại vị trí cũ
+			EntityMoveToTween(model, originalPivot, 1)
+
+			-- Khôi phục trạng thái di chuyển bình thường
+			model:SetAttribute("IsFakeout", false)
+			model:SetAttribute("FakeoutFinished", true)
+			model:SetAttribute("Paused", false)
+			model:SetAttribute("Damage", true)
+
+			config.Movement.Fakeout.Enabled = false
+			config.Movement.Speed = config.Movement.Speed * (fakeoutConfig.SpeedMultiplier or 2)
+			if config.Movement.SpeedFast then
+				config.Movement.SpeedFast = config.Movement.SpeedFast * (fakeoutConfig.SpeedMultiplier or 2)
+			end
+
+			-- Tiếp tục chu kỳ di chuyển bình thường cho entity này
+			model:SetAttribute("Running", false)
+			task.spawn(function()
+				Module:Run(entity, false, isReboundRespawn)
+			end)
+			return
 		end
 
 		if entity:IsAlive() and not model:GetAttribute("Despawning") then
