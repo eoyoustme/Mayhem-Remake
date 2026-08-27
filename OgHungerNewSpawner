@@ -1329,7 +1329,7 @@ LocalPlayer.CharacterAdded:Connect(OnCharacterAdded)
 
 Module.Create = function(self, config: any): any?
 	local newConfig = ApplyConfigDefaults(config, CONST.DEFAULT.CONFIG)
-	
+
 	if not config._speedProcessed then
 		newConfig.Movement.Speed = CONST.BASE_ENTITY_SPEED / 100 * config.Movement.Speed
 		if config.Movement and config.Movement.SpeedFast then
