@@ -1507,8 +1507,8 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 		task.spawn(entity.RunCallback, entity, "OnFakeoutStart")
 
 		-- 1. Tween 10 giây lùi xuống -100 stud (Quad In)
-		local downCFrame = targetSpawnCFrame - Vector3.new(0, 100, 0)
-		EntityMoveToTweenCustom(model, downCFrame, 10, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		local downCFrame = targetSpawnCFrame - Vector3.new(0, 20, 0)
+		EntityMoveToTweenCustom(model, downCFrame, 2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
 		-- Phát EndSound nếu có
 		if fakeoutConfig.EndSound and fakeoutConfig.EndSound ~= "" and fakeoutConfig.EndSound ~= "rbxassetid://" and fakeoutConfig.EndSound ~= "rbxassetid://0" then
@@ -1523,11 +1523,11 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 		task.spawn(entity.RunCallback, entity, "OnFakeoutEnd")
 
 		-- 2. Đợi 2 giây
-		local endDelay = fakeoutConfig.EndDelay or 2
+		local endDelay = fakeoutConfig.EndDelay or 1
 		task.wait(endDelay)
 
 		-- 3. Ngoi lên lại vị trí cũ trong 1s
-		EntityMoveToTweenCustom(model, targetSpawnCFrame, 1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		EntityMoveToTweenCustom(model, targetSpawnCFrame, 0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 		-- 4. Khôi phục lại trạng thái ban đầu
 		model:SetAttribute("IsFakeout", false)
