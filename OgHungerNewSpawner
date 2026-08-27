@@ -1506,9 +1506,11 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 		model:SetAttribute("Damage", false)
 		task.spawn(entity.RunCallback, entity, "OnFakeoutStart")
 
-		local downCFrame = targetSpawnCFrame - Vector3.new(0, 20, 0)
-		EntityMoveToTweenCustom(model, downCFrame, 2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		-- 1. Tween 10 giây lùi xuống -100 stud (Quad In)
+		local downCFrame = targetSpawnCFrame - Vector3.new(0, 100, 0)
+		EntityMoveToTweenCustom(model, downCFrame, 10, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
+		-- Phát EndSound nếu có
 		if fakeoutConfig.EndSound and fakeoutConfig.EndSound ~= "" and fakeoutConfig.EndSound ~= "rbxassetid://" and fakeoutConfig.EndSound ~= "rbxassetid://0" then
 			local sound = Instance.new("Sound")
 			sound.SoundId = fakeoutConfig.EndSound
@@ -1520,18 +1522,20 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 		task.spawn(entity.RunCallback, entity, "OnFakeoutEnd")
 
+		-- 2. Đợi 2 giây
 		local endDelay = fakeoutConfig.EndDelay or 2
 		task.wait(endDelay)
 
+		-- 3. Ngoi lên lại vị trí cũ trong 1s
 		EntityMoveToTweenCustom(model, targetSpawnCFrame, 1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
+		-- 4. Khôi phục lại trạng thái ban đầu
 		model:SetAttribute("IsFakeout", false)
 		model:SetAttribute("FakeoutFinished", true)
 		model:SetAttribute("Damage", true)
 	end
 
-	-- XỬ LÝ REBOUND CLONE STYLE (ĐÃ ĐƯỢC FIX KHÔNG BỊ CHẶN LỖI)
-	if config.Movement.ReboundMoveStyle and not model:GetAttribute("ReboundStyleStarted") then
+	if config.Movement.ReboundMoveStyle and not isReboundRespawn and not model:GetAttribute("ReboundStyleStarted") then
 		model:SetAttribute("ReboundStyleStarted", true)
 
 		task.spawn(function()
@@ -1558,14 +1562,12 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 					Debris:AddItem(sound, 5)
 				end
 
-				task.delay(config.Movement.ReboundStyleDelay or 2, function()
-					if entity:IsAlive() then
-						local newEntity = Module:Create(config)
-						if newEntity then
-							newEntity.Debug = CloneTable(entity.Debug)
-							task.spawn(entity.RunCallback, entity, "OnReboundStyle", newEntity)
-							Module:Run(newEntity, false, true)
-						end
+				task.delay(0.2, function()
+					local newEntity = Module:Create(config)
+					if newEntity then
+						newEntity.Debug = CloneTable(entity.Debug)
+						task.spawn(entity.RunCallback, entity, "OnReboundStyle", newEntity)
+						Module:Run(newEntity, false, true)
 					end
 				end)
 			end)
