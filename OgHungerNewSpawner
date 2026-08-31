@@ -94,6 +94,7 @@ local CONST = {
 				ReboundStyleSound = "rbxassetid://0",
 				ReboundStyleVolume = 1,
 				ReboundStyleDelay = 2,
+				IsMoveBackWardAndMore = false,
 				FasterAndFaster = false,
 				ChasePlayerWhenSee = false,
 				SpeedWhenChase = 7.5,
@@ -1342,7 +1343,7 @@ Module.Create = function(self, config: any): any?
 	local success, entityModel = false, nil
 
 	if typeof(asset) == "Instance" then
-		success, entityModel = true, asset
+		success, entityModel = true, asset:Clone()
 	elseif typeof(asset) == "string" then
 		success, entityModel = pcall(function()
 			local instance: Instance? = LoadCustomInstance(asset)
@@ -1506,11 +1507,9 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 		model:SetAttribute("Damage", false)
 		task.spawn(entity.RunCallback, entity, "OnFakeoutStart")
 
-		-- 1. Tween 10 giây lùi xuống -100 stud (Quad In)
 		local downCFrame = targetSpawnCFrame - Vector3.new(0, 20, 0)
 		EntityMoveToTweenCustom(model, downCFrame, 2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
-		-- Phát EndSound nếu có
 		if fakeoutConfig.EndSound and fakeoutConfig.EndSound ~= "" and fakeoutConfig.EndSound ~= "rbxassetid://" and fakeoutConfig.EndSound ~= "rbxassetid://0" then
 			local sound = Instance.new("Sound")
 			sound.SoundId = fakeoutConfig.EndSound
@@ -1522,14 +1521,11 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 
 		task.spawn(entity.RunCallback, entity, "OnFakeoutEnd")
 
-		-- 2. Đợi 2 giây
 		local endDelay = fakeoutConfig.EndDelay or 1
 		task.wait(endDelay)
 
-		-- 3. Ngoi lên lại vị trí cũ trong 1s
 		EntityMoveToTweenCustom(model, targetSpawnCFrame, 0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
-		-- 4. Khôi phục lại trạng thái ban đầu
 		model:SetAttribute("IsFakeout", false)
 		model:SetAttribute("FakeoutFinished", true)
 		model:SetAttribute("Damage", true)
@@ -1543,6 +1539,7 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 			local soundId = config.Movement.ReboundStyleSound
 			local volume = config.Movement.ReboundStyleVolume or 1
 			local spawnedCount = 0
+			local lastReversedState = config.Movement.Reversed
 
 			local connection
 			connection = CurrentRooms.ChildAdded:Connect(function(newRoom)
@@ -1563,7 +1560,14 @@ Module.Run = function(self, entity: any, copyEntity: boolean, isReboundRespawn: 
 				end
 
 				task.delay(0.2, function()
-					local newEntity = Module:Create(config)
+					local cloneConfig = CloneTable(config)
+
+					if config.Movement.IsMoveBackWardAndMore then
+						lastReversedState = not lastReversedState
+						cloneConfig.Movement.Reversed = lastReversedState
+					end
+
+					local newEntity = Module:Create(cloneConfig)
 					if newEntity then
 						newEntity.Debug = CloneTable(entity.Debug)
 						task.spawn(entity.RunCallback, entity, "OnReboundStyle", newEntity)
